@@ -1,0 +1,12 @@
+# Secrets / configuration locale
+.env
+
+# Données d'exécution (config & données de service)
+config/
+data/
+*.log
+
+# Divers
+__pycache__/
+*.pyc
+.DS_Store

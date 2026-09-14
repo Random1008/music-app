@@ -1,0 +1,20 @@
+# Hermes Music — Plateforme de streaming musical personnelle
+# V0.1 : Infrastructure (Jellyfin + bibliothèque + accès local)
+
+services:
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    # Accès local uniquement pour l'instant (HTTP). Le reverse proxy HTTPS
+    # arrive en V0.7 (service "caddy").
+    ports:
+      - "${JELLYFIN_PORT:-8096}:8096"
+    environment:
+      - PUID=${PUID:-1002}
+      - PGID=${PGID:-10}
+      - TZ=${TZ:-Europe/Brussels}
+    volumes:
+      - ./config/jellyfin:/config
+      # Bibliothèque en lecture seule : Jellyfin lit /music/Artists.
+      - ${MUSIC_LIBRARY_PATH:-~/Music}:/music:ro
