@@ -1,0 +1,2 @@
+# Hermes Music — Importateur
+yt-dlp>=2024.1.0

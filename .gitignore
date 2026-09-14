@@ -6,6 +6,10 @@ config/
 data/
 *.log
 
+# Importateur : venv + données personnelles (listes de pistes, état)
+.venv/
+importer/library/
+
 # Divers
 __pycache__/
 *.pyc
