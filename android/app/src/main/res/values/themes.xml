@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Thème Android minimal : tout le rendu est fait par Compose. -->
+    <style name="Theme.HermesMusic" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/nocturne_bg</item>
+        <item name="android:statusBarColor">@color/nocturne_bg</item>
+        <item name="android:navigationBarColor">@color/nocturne_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

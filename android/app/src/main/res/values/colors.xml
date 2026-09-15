@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Design « Nocturne » : fond très sombre, accent violet -->
+    <color name="nocturne_bg">#08090F</color>
+    <color name="nocturne_accent">#7C5CFF</color>
+    <color name="ic_launcher_background">#08090F</color>
+</resources>

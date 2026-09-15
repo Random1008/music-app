@@ -1,16 +1,36 @@
 # Secrets / configuration locale
 .env
 
-# Données d'exécution (config & données de service)
-config/
-data/
+# Données d'exécution (config & données de service) — ancrées à la racine,
+# sinon « data/ » masquerait aussi le package Kotlin android/.../data/
+/config/
+/data/
 *.log
 
 # Importateur : venv + données personnelles (listes de pistes, état)
 .venv/
 importer/library/
 
+# Android : sorties de build et fichiers locaux (jamais de keystore en dépôt)
+android/.gradle/
+android/.idea/
+android/local.properties
+android/captures/
+android/build/
+android/**/build/
+android/keystore.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+
 # Divers
 __pycache__/
 *.pyc
 .DS_Store
+
+# Maquette et captures : contiennent des noms d'artistes/morceaux personnels
+# (le dépôt est PUBLIC) -> jamais versionnées.
+design/
+web/renders/
+web/apk/
