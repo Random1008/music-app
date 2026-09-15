@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -66,11 +65,8 @@ android {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
+// jvmTarget est aligné automatiquement sur compileOptions par le support Kotlin
+// intégré d'AGP 9 : inutile (et risqué) de le fixer à la main.
 
 dependencies {
     implementation(libs.androidx.core.ktx)

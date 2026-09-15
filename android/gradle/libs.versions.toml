@@ -1,8 +1,13 @@
 # Catalogue de versions — toutes les versions ci-dessous ont été vérifiées
 # contre les dépôts réels (Google Maven / Maven Central), pas supposées.
+#
+# Kotlin : depuis AGP 9.0 le support Kotlin est INTÉGRÉ au plugin Android et le
+# plugin « org.jetbrains.kotlin.android » ne doit plus être appliqué. AGP 9.4.0
+# embarque Kotlin 2.2.10 : on s'aligne sur cette version pour les plugins
+# Compose et serialization (aucun désalignement possible).
 [versions]
 agp = "9.4.0"
-kotlin = "2.4.20"
+kotlin = "2.2.10"
 coreKtx = "1.19.0"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"
@@ -52,6 +57,6 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# Pas de plugin kotlin.android : AGP 9 l'intègre nativement (built-in Kotlin).
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
