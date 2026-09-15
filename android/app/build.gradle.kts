@@ -16,7 +16,11 @@ val hasDevKeystore = keystoreProps.getProperty("storeFile") != null
 
 android {
     namespace = "fr.hermesmusic"
-    compileSdk = 36
+    // compileSdk 37 est exigé par plusieurs dépendances (Compose 1.12.1,
+    // core 1.19.0, lifecycle 2.11.0, Coil 3.6.2, okhttp-android 5.5.0).
+    // targetSdk reste à 36 : on n'opte pas dans les nouveaux comportements
+    // d'exécution d'Android 17 (compileSdk et targetSdk sont indépendants).
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "fr.hermesmusic"
