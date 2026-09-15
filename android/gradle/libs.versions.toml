@@ -3,11 +3,12 @@
 #
 # Kotlin : depuis AGP 9.0 le support Kotlin est INTÉGRÉ au plugin Android et le
 # plugin « org.jetbrains.kotlin.android » ne doit plus être appliqué. AGP 9.4.0
-# embarque Kotlin 2.2.10 : on s'aligne sur cette version pour les plugins
-# Compose et serialization (aucun désalignement possible).
+# embarque Kotlin 2.2.10, trop ancien pour kotlin-stdlib 2.4.x tiré par nos
+# dépendances : la montée de version se fait via un classpath KGP dans le
+# buildscript du build racine (procédure officielle AGP).
 [versions]
 agp = "9.4.0"
-kotlin = "2.2.10"
+kotlin = "2.4.20"
 coreKtx = "1.19.0"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"

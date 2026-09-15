@@ -144,6 +144,17 @@ class MusicRepository(
         }
     )
 
+    suspend fun playlists(): QueryResult = api.items(
+        base(
+            mapOf(
+                "IncludeItemTypes" to "Playlist",
+                "Recursive" to "true",
+                "SortBy" to "SortName",
+                "Limit" to "100",
+            )
+        )
+    )
+
     suspend fun item(itemId: String): JfItem = api.items(base(mapOf("Ids" to itemId))).Items.first()
 
     suspend fun setFavorite(itemId: String, favorite: Boolean) {

@@ -314,15 +314,21 @@ fun PlaylistsTab(graph: AppGraph) {
 
     LaunchedEffect(Unit) {
         playlists = runCatching {
-            graph.repo.search("").Items
+            graph.repo.playlists().Items
         }.getOrDefault(emptyList())
     }
 
     if (playlists.isNullOrEmpty()) {
         EmptyState(
-            "Playlists",
-            "La gestion des playlists Jellyfin arrive à une prochaine étape.",
+            "Aucune playlist",
+            "Aucune playlist n'existe encore dans Jellyfin. Crée-en une depuis Jellyfin, elle apparaîtra ici.",
         )
+    } else {
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(playlists!!, key = { it.Id }) { pl ->
+                TrackRow(graph, pl, subtitle = "${pl.ChildCount ?: 0} morceaux")
+            }
+        }
     }
 }
 
