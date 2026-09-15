@@ -10,7 +10,7 @@ Usage:
   python3 importer.py [--limit N] [--only "artiste - titre"]
 
 Variables d'environnement:
-  MUSIC_LIBRARY_PATH  (défaut ~/Music)
+  MUSIC_LIBRARY_PATH  (défaut /srv/music)
   JELLYFIN_URL        (défaut http://localhost:8096)
   JELLYFIN_API_KEY    clé API Jellyfin pour le scan
   YTDLP               chemin vers yt-dlp (défaut "yt-dlp")
