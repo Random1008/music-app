@@ -33,6 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TRACKS_JSON = os.path.join(HERE, "library", "tracks.json")
 STATUS_JSON = os.path.join(HERE, "library", "status.json")
 YTDLP = os.environ.get("YTDLP", "yt-dlp")
+YTDLP_COOKIES = os.environ.get("YTDLP_COOKIES", "")
 FFMPEG = "ffmpeg"
 JELLYFIN_URL = os.environ.get("JELLYFIN_URL", "http://localhost:8096")
 JELLYFIN_API_KEY = os.environ.get("JELLYFIN_API_KEY", "")
@@ -74,24 +75,51 @@ def target_path(track):
     return os.path.join(ARTISTS_DIR, sanitize(artist), sanitize(album), fname)
 
 
-def download_audio(query, tmpdir):
-    # 1. Résoudre la recherche -> titre + URL (sans télécharger)
-    p1 = subprocess.run([YTDLP, "--js-runtimes", "node", "--no-playlist",
-                         "--skip-download",
-                         "--print", "%(title)s", "--print", "%(webpage_url)s",
-                         f"ytsearch1:{query}"],
-                        capture_output=True, text=True, timeout=90)
-    if p1.returncode != 0:
-        raise RuntimeError(f"yt-dlp search: {p1.stderr.strip()[-250:]}")
+def _ytdlp_base(cookies):
+    base = [YTDLP, "--js-runtimes", "node", "--no-playlist"]
+    if cookies:
+        base += ["--cookies", cookies]
+    return base
+
+
+def _resolve(query, cookies):
+    """Cherche un morceau et renvoie (titre_youtube, url) ou None."""
+    p1 = subprocess.run(
+        _ytdlp_base(cookies) + ["--skip-download",
+                                "--print", "%(title)s",
+                                "--print", "%(webpage_url)s",
+                                f"ytsearch1:{query}"],
+        capture_output=True, text=True, timeout=90)
     lines = [l for l in p1.stdout.splitlines() if l.strip()]
-    yt_title = lines[-2].strip() if len(lines) >= 2 else "?"
-    yt_url = lines[-1].strip() if lines else "?"
+    url = lines[-1].strip() if lines else ""
+    if p1.returncode == 0 and url.startswith("http"):
+        return (lines[-2].strip() if len(lines) >= 2 else "?"), url
+    return None
+
+
+def download_audio(artist, title, tmpdir):
+    cookies = YTDLP_COOKIES
+    # variantes de requête : précise d'abord, puis plus large (aide la recherche)
+    variants = [f"{artist} - {title}", f"{title} {artist} audio"]
+    yt_title = yt_url = None
+    for q in variants:
+        for attempt in (1, 2):
+            res = _resolve(q, cookies)
+            if res:
+                yt_title, yt_url = res
+                break
+            time.sleep(3 * attempt)
+        if yt_url:
+            break
+    if not yt_url:
+        raise RuntimeError("recherche sans résultat (toutes variantes épuisées)")
     # 2. Télécharger l'audio
     out_tmpl = os.path.join(tmpdir, "audio.%(ext)s")
-    p2 = subprocess.run([YTDLP, "--js-runtimes", "node", "--no-playlist",
-                         "-f", "bestaudio", "--retries", "3",
-                         "--socket-timeout", "20", "-o", out_tmpl, yt_url],
-                        capture_output=True, text=True, timeout=240)
+    p2 = subprocess.run(
+        _ytdlp_base(cookies) + ["-f", "bestaudio", "--retries", "3",
+                                "--socket-timeout", "20",
+                                "-o", out_tmpl, yt_url],
+        capture_output=True, text=True, timeout=240)
     if p2.returncode != 0:
         raise RuntimeError(f"yt-dlp download: {p2.stderr.strip()[-250:]}")
     files = [f for f in glob.glob(os.path.join(tmpdir, "audio.*"))
@@ -190,7 +218,7 @@ def main():
         query = f"{artist} - {t['title']}"
         tmpdir = tempfile.mkdtemp(prefix="imp_")
         try:
-            audio, yt_title, yt_url = download_audio(query, tmpdir)
+            audio, yt_title, yt_url = download_audio(artist, t["title"], tmpdir)
             cover = download_cover(t.get("image_url"), tmpdir)
             os.makedirs(os.path.dirname(out), exist_ok=True)
             convert_and_tag(audio, cover, t, out)
