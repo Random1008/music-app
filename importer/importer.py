@@ -82,13 +82,12 @@ def _ytdlp_base(cookies):
     return base
 
 
-def _resolve(query, cookies):
-    """Cherche un morceau et renvoie (titre_youtube, url) ou None."""
+def _info(target, cookies):
+    """target = URL directe ou 'ytsearch1:...' ; renvoie (titre, url) ou None."""
     p1 = subprocess.run(
         _ytdlp_base(cookies) + ["--skip-download",
                                 "--print", "%(title)s",
-                                "--print", "%(webpage_url)s",
-                                f"ytsearch1:{query}"],
+                                "--print", "%(webpage_url)s", target],
         capture_output=True, text=True, timeout=90)
     lines = [l for l in p1.stdout.splitlines() if l.strip()]
     url = lines[-1].strip() if lines else ""
@@ -97,23 +96,25 @@ def _resolve(query, cookies):
     return None
 
 
-def download_audio(artist, title, tmpdir):
+def download_audio(artist, title, tmpdir, url=None):
     cookies = YTDLP_COOKIES
-    # variantes de requête : précise d'abord, puis plus large (aide la recherche)
-    variants = [f"{artist} - {title}", f"{title} {artist} audio"]
     yt_title = yt_url = None
-    for q in variants:
-        for attempt in (1, 2):
-            res = _resolve(q, cookies)
-            if res:
-                yt_title, yt_url = res
+    if url:  # URL fournie (override) : pas de recherche
+        res = _info(url, cookies)
+        yt_title, yt_url = res if res else (url, url)
+    else:  # recherche : variantes, précise puis plus large
+        for q in (f"{artist} - {title}", f"{title} {artist} audio"):
+            for attempt in (1, 2):
+                res = _info(f"ytsearch1:{q}", cookies)
+                if res:
+                    yt_title, yt_url = res
+                    break
+                time.sleep(3 * attempt)
+            if yt_url:
                 break
-            time.sleep(3 * attempt)
-        if yt_url:
-            break
     if not yt_url:
         raise RuntimeError("recherche sans résultat (toutes variantes épuisées)")
-    # 2. Télécharger l'audio
+    # Télécharger l'audio
     out_tmpl = os.path.join(tmpdir, "audio.%(ext)s")
     p2 = subprocess.run(
         _ytdlp_base(cookies) + ["-f", "bestaudio", "--retries", "3",
@@ -194,6 +195,12 @@ def main():
     with open(TRACKS_JSON, encoding="utf-8") as f:
         tracks = json.load(f)
     status = load_status()
+    overrides = {}
+    ov_path = os.path.join(HERE, "library", "overrides.json")
+    if os.path.exists(ov_path):
+        with open(ov_path, encoding="utf-8") as f:
+            overrides = json.load(f)
+        log(f"overrides chargés: {len(overrides)}")
 
     todo = tracks
     if args.only:
@@ -218,7 +225,8 @@ def main():
         query = f"{artist} - {t['title']}"
         tmpdir = tempfile.mkdtemp(prefix="imp_")
         try:
-            audio, yt_title, yt_url = download_audio(artist, t["title"], tmpdir)
+            audio, yt_title, yt_url = download_audio(artist, t["title"], tmpdir,
+                                                     url=overrides.get(uri))
             cover = download_cover(t.get("image_url"), tmpdir)
             os.makedirs(os.path.dirname(out), exist_ok=True)
             convert_and_tag(audio, cover, t, out)
