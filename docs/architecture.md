@@ -1,52 +1,71 @@
 # Hermes Music — Architecture
 
-## Environnement réel (constaté)
+## Vue d'ensemble
 
-- **Hôte** : un NAS, Debian 12 (bookworm), Linux (linux).
-- **Rôle de l'hôte** : il EST le NAS et le serveur (pas de NAS distant à monter).
-- **Ressources** : 8 cœurs, 7,5 Go RAM, volume1 = 3,6 To (3,5 To libres) monté sur `/home` (`/volume1/@home`).
-- **Hermes** : s'exécute dans un conteneur sur le NAS, avec accès au socket Docker
-  (peut créer/gérer les conteneurs du projet).
-- **Outils dispo** : Docker 26.1 + Compose v2.26, FFmpeg/ffprobe 5.1, Python 3.11, git.
-- **À installer** : yt-dlp (V0.2), image Jellyfin (pull via Docker).
+```
+                    ┌────────────────────┐
+                    │    ANDROID APP     │
+                    │  (client Jellyfin) │
+                    └─────────┬──────────┘
+                              │ HTTPS
+                              ▼
+                     ┌────────────────┐
+                     │    JELLYFIN    │
+                     │ auth, biblio,  │
+                     │ streaming,     │
+                     │ playlists,     │
+                     │ historique     │
+                     └────────┬───────┘
+                              │
+                              ▼
+                    Bibliothèque (/music/Artists)
+                              ▲
+                              │ scan
+                    ┌─────────┴─────────┐
+                    │    IMPORTATEUR    │
+                    │ yt-dlp + FFmpeg   │
+                    └───────────────────┘
+```
+
+Hébergement : conteneurs Docker (`docker-compose.yml`) sur un hôte Linux
+(Debian). Le stockage (bibliothèque) est un volume local exposé au conteneur
+Jellyfin en lecture seule.
 
 ## Choix techniques
 
-- **Jellyfin** : image `linuxserver/jellyfin` (support Linux, contrôle PUID/PGID).
-  Cœur de la bibliothèque, du streaming, des playlists, de l'historique et des favoris.
-- **Stockage** : bibliothèque dans `~/Music` (volume1), exposée en
-  lecture seule au conteneur sous `/music`.
-- **Importateur** : service dédié (Python + yt-dlp + FFmpeg) — V0.2.
-- **Reverse proxy** : Caddy (HTTPS automatique) — V0.7.
-- **Android** : Kotlin + Jetpack Compose — V0.3.
+- **Jellyfin** — image `linuxserver/jellyfin` (support Linux, contrôle PUID/PGID).
+  C'est la source de vérité : bibliothèque, streaming, playlists, historique,
+  favoris. Aucun backend custom ne duplique ces fonctions.
+- **Stockage** — bibliothèque dans `${MUSIC_LIBRARY_PATH}` (défaut `/srv/music`),
+  exposée en lecture seule au conteneur sous `/music`.
+- **Importateur** — Python + yt-dlp + FFmpeg. yt-dlp est un importateur, jamais
+  un serveur de streaming : une fois le fichier dans la bibliothèque, Jellyfin
+  s'occupe de la lecture.
+- **Reverse proxy** — Caddy (HTTPS automatique) — V0.7.
+- **Android** — Kotlin + Jetpack Compose, client de l'API Jellyfin — V0.3.
 
-## Arborescence bibliothèque (spec §5)
+## Arborescence bibliothèque
 
 ```
-~/Music/
+${MUSIC_LIBRARY_PATH}/
 ├── Artists/      ← racine de bibliothèque Jellyfin (Artiste/Album/Piste)
 ├── Playlists/    ← exports .m3u (futur)
 ├── Incoming/     ← zone de travail de l'importateur
-├── Failed/       ← échecs (pour diagnostic)
-└── Metadata/     ← jaquettes/métadonnées de l'importateur
+├── Failed/       ← échecs (diagnostic)
+└── Metadata/     ← jaquettes / métadonnées
 ```
 
-Jellyfin est pointé uniquement sur `Artists/` pour ne pas indexer `Incoming/`
-et `Failed/`.
-
-## Flux de données
-
-```
-URL autorisée ─► Importateur (yt-dlp ─► FFmpeg ─► métadonnées)
-        │
-        └─► Music/Incoming ─► Music/Artists/... ─► scan Jellyfin
-                                                          │
-Android (Hermes Music) ◄── HTTPS ── Reverse proxy ── Jellyfin
-```
+Jellyfin n'est pointé que sur `Artists/` pour ne pas indexer `Incoming/` et `Failed/`.
 
 ## Ports
 
-- 8096 : Jellyfin HTTP (local, V0.1). Sera masqué derrière Caddy en V0.7.
+- 8096 : Jellyfin HTTP (accès local). Masqué derrière Caddy (HTTPS) en V0.7.
+
+## Sécurité
+
+- Aucun secret dans Git : `.env` (identifiants, clés API) est ignoré.
+- Les données personnelles (listes de pistes, état d'import) sont sous
+  `importer/library/`, également ignoré.
 
 ## Roadmap
 

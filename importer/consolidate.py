@@ -2,7 +2,7 @@
 """Consolide les CSV Exportify en une liste unique de pistes (tracks.json)."""
 import csv, json, glob, os
 
-SRC = "~/Downloads"
+SRC = os.path.expanduser(os.environ.get("SPOTIFY_CSV_DIR", "~/Downloads"))
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(HERE, "library")
 OUT = os.path.join(OUT_DIR, "tracks.json")

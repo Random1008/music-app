@@ -27,7 +27,7 @@ import tempfile
 import time
 import urllib.request
 
-BASE = os.environ.get("MUSIC_LIBRARY_PATH", "~/Music")
+BASE = os.environ.get("MUSIC_LIBRARY_PATH", "/srv/music")
 ARTISTS_DIR = os.path.join(BASE, "Artists")
 HERE = os.path.dirname(os.path.abspath(__file__))
 TRACKS_JSON = os.path.join(HERE, "library", "tracks.json")

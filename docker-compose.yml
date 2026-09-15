@@ -17,4 +17,4 @@ services:
     volumes:
       - ./config/jellyfin:/config
       # Bibliothèque en lecture seule : Jellyfin lit /music/Artists.
-      - ${MUSIC_LIBRARY_PATH:-~/Music}:/music:ro
+      - ${MUSIC_LIBRARY_PATH:-/srv/music}:/music:ro
