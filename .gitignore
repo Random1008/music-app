@@ -33,4 +33,7 @@ __pycache__/
 # (le dépôt est PUBLIC) -> jamais versionnées.
 design/
 web/renders/
-web/apk/
+# L'APK est un artefact de build (jamais versionné), mais la page d'installation
+# qui l'accompagne est un vrai fichier du projet : on la ré-inclut.
+web/apk/*
+!web/apk/index.html
