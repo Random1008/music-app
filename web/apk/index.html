@@ -26,8 +26,8 @@
           color:#0E0F18; font-weight:500; font-size:15px; text-decoration:none }
   h2 { font:500 10px ui-monospace,Menlo,monospace; letter-spacing:.14em; color:var(--dim2);
        margin:32px 0 12px }
-  ol { margin:0; padding-left:20px; color:var(--dim); font-size:13.5px; line-height:1.75 }
-  ol b { color:var(--ink); font-weight:500 }
+  ol, ul { margin:0; padding-left:20px; color:var(--dim); font-size:13.5px; line-height:1.75 }
+  ol b, li b { color:var(--ink); font-weight:500 }
   code { font:400 12px ui-monospace,Menlo,monospace; color:var(--ink);
          background:var(--surface2); padding:2px 6px; border-radius:5px; word-break:break-all }
   .note { margin-top:26px; padding:12px 14px; border-radius:10px; background:var(--surface2);
@@ -39,15 +39,24 @@
 <main>
   <div class="kicker">HERMES MUSIC</div>
   <h1>Installer l'application</h1>
-  <div class="sub">Application Android · version 0.3.1</div>
+  <div class="sub">Application Android · version 0.4.0</div>
 
   <div class="card">
     <div class="name">Hermes Music</div>
     <div class="meta">fr.hermesmusic · 23,8 Mo · Android 8+ (minSdk 26)</div>
     <div class="meta">Signée avec la clé de développement stable<br>(71:F3:BF:DA:CA:B1:3F:5B:0E:D5:C3:65:4A:4C:65:64:…)</div>
-    <div class="hash">SHA-256 : aa3d326c0dad594461f3f6c799ded83a62ca32bfe9d27d2d544084fdbb94ab4e</div>
-    <a class="btn" href="hermes-music-0.3.1-debug.apk" download>Télécharger l'APK</a>
+    <div class="hash">SHA-256 : 11eaa0a64a0be2e7460a8e46308d71348ad8c2992019f0bd62c49b71a2e038c1</div>
+    <a class="btn" href="hermes-music-0.4.0-debug.apk" download>Télécharger l'APK</a>
   </div>
+
+  <h2>NOUVEAU DANS CETTE VERSION</h2>
+  <ul>
+    <li><b>La musique se lance enfin.</b> Clique un morceau : il joue.</li>
+    <li>Clic sur un <b>album</b> : tout l'album démarre.</li>
+    <li><b>Mini-lecteur</b> en bas (jaquette, titre, lecture/pause, suivant).</li>
+    <li><b>Lecteur plein écran</b> : seek, aléatoire, répétition.</li>
+    <li>Lecture en arrière-plan, notification, commandes du casque.</li>
+  </ul>
 
   <h2>INSTALLATION SUR LE TÉLÉPHONE</h2>
   <ol>
@@ -55,7 +64,10 @@
     <li>Android demandera d'autoriser l'installation depuis cette source
         (<b>Paramètres → Applis → Accès spéciaux → Installer des applis inconnues</b>).</li>
     <li>Ouvre le fichier téléchargé et installe.</li>
-    <li>Au premier lancement, saisis l'adresse du serveur, l'utilisateur et le mot de passe.</li>
+    <li>Au premier lancement, saisis l'utilisateur et le mot de passe (l'adresse du
+        serveur est déjà pré-remplie).</li>
+    <li>Autorise les <b>notifications</b> quand Android le demande : c'est ce qui
+        affiche la commande de lecture.</li>
   </ol>
 
   <div class="note">
