@@ -8,6 +8,26 @@ Interface en français, thème sombre « Nocturne » repris de la maquette valid
 (fond `#08090F`, surfaces `#1F2130`/`#171926`, accent `#7C5CFF`, texte `#E9E9ED`,
 secondaire `#9397AB`, libellés monospace en majuscules).
 
+## Ce que fait l'application aujourd'hui
+
+| Écran | Contenu |
+|---|---|
+| Connexion | adresse du serveur, utilisateur, mot de passe (jamais conservé) |
+| Accueil | compteurs de la bibliothèque, albums récents, derniers ajouts |
+| Recherche | morceaux, albums, artistes — recherche instantanée |
+| Bibliothèque | Albums / Artistes / Morceaux / **Favoris** |
+| Page album | pochette, artiste, année, durée, Lecture, Aléatoire, cœur, pistes numérotées |
+| Page artiste | photo (ou pochette du premier album), ses albums, ses titres les plus écoutés |
+| Playlists | liste des playlists Jellyfin |
+| Mini-lecteur | permanent au-dessus des onglets : jaquette, titre, lecture/pause, suivant, progression |
+| Lecteur plein écran | seek, précédent/suivant, aléatoire, répétition, **favori**, **file d'attente** |
+| File d'attente | liste de ce qui va suivre, saut direct à un morceau |
+| Notification | commandes lecture/pause/suivant, écran verrouillé, casque Bluetooth |
+
+La lecture continue quand l'application passe en arrière-plan, quand l'écran est
+verrouillé et quand on change d'écran : le lecteur vit dans un service, pas dans
+l'interface.
+
 ## Où le projet est compilé, et pourquoi pas ici
 
 Le serveur de développement (le NAS) est **Linux** et n'a aucun outil Android :
@@ -31,7 +51,8 @@ NAS (Linux)                    Hôte de build (x86_64)
 | Gradle | 9.6.1 | |
 | Android Gradle Plugin | 9.4.0 | |
 | Kotlin | 2.4.20 | + plugin Compose compiler 2.4.20 |
-| compileSdk / targetSdk | 36 | android-37 n'existe pas encore |
+| compileSdk | 37 | plateformes versionnées en mineur : `android-37.0`, `android-37.2` |
+| targetSdk | 36 | on n'opte pas dans les comportements d'Android 17 |
 | minSdk | 26 | Android 8+ |
 | Compose BOM | 2026.09.00 | |
 | Media3 (ExoPlayer) | 1.11.1 | |
@@ -56,10 +77,16 @@ app/src/main/java/fr/hermesmusic/
 ├── network/
 │   ├── JellyfinApi.kt    interface Retrofit
 │   └── JellyfinModels.kt DTO
+├── player/
+│   ├── PlaybackService.kt   MediaSessionService — le lecteur VIT ici, pas dans l'UI
+│   ├── PlayerConnection.kt  télécommande (MediaController) + état exposé à l'UI
+│   └── PlaybackReporter.kt  déclaration des lectures à Jellyfin
 └── ui/
     ├── LoginScreen.kt  connexion (le mot de passe n'est jamais conservé)
     ├── Shell.kt        navigation 4 onglets + mini-lecteur
-    └── Screens.kt      Accueil, Recherche, Bibliothèque, Playlists
+    ├── Screens.kt      Accueil, Recherche, Bibliothèque, Playlists
+    ├── Detail.kt       pages album et artiste
+    └── PlayerScreen.kt lecteur plein écran + file d'attente
 ```
 
 Un seul module tant que l'app reste de cette taille : découper en
@@ -93,7 +120,7 @@ efface les réglages et casse l'usage quotidien.
 
 * `allowBackup=false` : aucun jeton ne part dans une sauvegarde cloud.
 * `network_security_config` : le trafic **en clair** n'est autorisé que vers le
-  serveur personnel (VPN Netbird / réseau local), jamais globalement.
+  serveur personnel (Tailscale / réseau local), jamais globalement.
 * Le mot de passe n'est jamais écrit sur le disque : seul le jeton d'accès Jellyfin
   est conservé (DataStore).
 * Permissions limitées au strict nécessaire (INTERNET, lecture en arrière-plan,
@@ -105,8 +132,20 @@ efface les réglages et casse l'usage quotidien.
   sessions « fantômes » et l'historique devient incohérent.
 * **Un seul client OkHttp** partagé par Retrofit, Coil et le lecteur audio : mêmes
   délais, même en-tête d'authentification, même connexions.
+* **Le lecteur ne vit pas dans l'interface.** Il tourne dans un
+  `MediaSessionService` et l'UI ne garde qu'un `MediaController`. C'est ce qui fait
+  que la musique survit au changement d'écran, à l'arrière-plan et au verrouillage
+  — et qu'on ne recrée jamais le lecteur.
+* **Déclaration des lectures.** L'app POSTe `/Sessions/Playing` au changement de
+  morceau et `/Sessions/Playing/Progress` toutes les 10 s. Sans ces appels,
+  Jellyfin ignore ce que l'app joue : pas d'historique, pas de « Reprendre la
+  lecture », pas de compteur d'écoute. Un échec de déclaration n'interrompt
+  jamais la musique (erreurs avalées volontairement).
 * Lecture audio : `/Audio/<id>/stream?static=true` (renvoie `audio/mpeg` avec
   support du `Range`, donc un seek correct). ``/Audio/<id>/universal`` renvoie du
   transcodé sans `Range` — seek cassé, à éviter comme chemin principal.
 * Pochettes toujours demandées avec un `maxHeight` raisonnable, jamais en pleine
   résolution.
+* Navigation volontairement minimale : quatre onglets plus **un seul** écran
+  empilé (album ou artiste) modélisé par un `StateFlow<Detail?>` dans `AppGraph`.
+  Pas de bibliothèque de navigation pour deux cas d'usage.
