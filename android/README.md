@@ -137,7 +137,7 @@ câblage pour un projet à un seul développeur.
 
 ## Tests
 
-27 tests unitaires JVM (`./gradlew testDebugUnitTest`), volontairement centrés
+29 tests unitaires JVM (`./gradlew testDebugUnitTest`), volontairement centrés
 sur ce qui casse en silence :
 
 | Fichier | Ce qui est vérifié |
