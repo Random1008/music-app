@@ -42,4 +42,16 @@ interface JellyfinApi {
         @Path("userId") userId: String,
         @Path("itemId") itemId: String,
     )
+
+    /* --- Déclaration des lectures : sans ces appels, Jellyfin ignore ce que
+       l'application joue (pas d'historique, pas de reprise, pas de compteur). --- */
+
+    @POST("Sessions/Playing")
+    suspend fun reportPlaybackStart(@Body body: PlaybackProgressInfo)
+
+    @POST("Sessions/Playing/Progress")
+    suspend fun reportPlaybackProgress(@Body body: PlaybackProgressInfo)
+
+    @POST("Sessions/Playing/Stopped")
+    suspend fun reportPlaybackStopped(@Body body: PlaybackProgressInfo)
 }

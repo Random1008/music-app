@@ -70,3 +70,22 @@ data class QueryResult(
     val Items: List<JfItem> = emptyList(),
     val TotalRecordCount: Int = 0,
 )
+
+/**
+ * Corps envoyé à Jellyfin pour déclarer une lecture (/Sessions/Playing,
+ * /Sessions/Playing/Progress). Jellyfin reste la source de vérité de
+ * l'historique : c'est ce corps qui alimente « Reprendre la lecture »,
+ * le compteur d'écoute et la liste des morceaux récemment joués.
+ */
+@Serializable
+data class PlaybackProgressInfo(
+    val ItemId: String,
+    /** 1 seconde = 10 000 000 ticks (unité .NET utilisée par Jellyfin). */
+    val PositionTicks: Long = 0,
+    val IsPaused: Boolean = false,
+    val IsMuted: Boolean = false,
+    val CanSeek: Boolean = true,
+    /** Lecture directe du fichier : c'est exactement ce que fait notre flux `static=true`. */
+    val PlayMethod: String = "DirectStream",
+    val VolumeLevel: Int = 100,
+)

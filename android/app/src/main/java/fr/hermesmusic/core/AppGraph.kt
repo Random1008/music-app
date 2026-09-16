@@ -10,8 +10,11 @@ import fr.hermesmusic.data.SettingsStore
 import fr.hermesmusic.network.AuthRequest
 import fr.hermesmusic.network.JellyfinApi
 import fr.hermesmusic.network.JfItem
+import fr.hermesmusic.player.PlaybackReporter
 import fr.hermesmusic.player.PlayerConnection
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +29,18 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
 /**
+ * Écran empilé par-dessus les onglets. Volontairement minimal : un album ou
+ * un artiste, rien d'autre — pas de bibliothèque de navigation pour deux cas.
+ */
+sealed interface Detail {
+    val id: String
+    val title: String
+
+    data class Album(override val id: String, override val title: String) : Detail
+    data class Artist(override val id: String, override val title: String) : Detail
+}
+
+/**
  * Conteneur d'injection MANUEL (pas de Hilt/Koin : complexité inutile ici).
  * Expose la session, le client HTTP partagé et le dépôt de données.
  */
@@ -34,7 +49,7 @@ class AppGraph(private val context: Context) {
     companion object {
         const val CLIENT = "Hermes Music"
         const val DEVICE = "Android"
-        const val VERSION = "0.3.0"
+        const val VERSION = "0.5.0"
     }
 
     val settings = SettingsStore(context)
@@ -44,6 +59,22 @@ class AppGraph(private val context: Context) {
 
     private val _ready = MutableStateFlow(false)
     val ready: StateFlow<Boolean> = _ready.asStateFlow()
+
+    /** Écran de détail ouvert (album/artiste), ou null. */
+    private val _detail = MutableStateFlow<Detail?>(null)
+    val detail: StateFlow<Detail?> = _detail.asStateFlow()
+
+    fun openAlbum(id: String, title: String) {
+        _detail.value = Detail.Album(id, title)
+    }
+
+    fun openArtist(id: String, title: String) {
+        _detail.value = Detail.Artist(id, title)
+    }
+
+    fun closeDetail() {
+        _detail.value = null
+    }
 
     val json = Json {
         ignoreUnknownKeys = true
@@ -122,6 +153,22 @@ class AppGraph(private val context: Context) {
                 )
                 .build()
         }
+    }
+
+    /** Portée applicative : survit aux écrans (déclaration des lectures). */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val reporter by lazy {
+        PlaybackReporter(api = { api() }, state = player.state)
+    }
+
+    /**
+     * Démarre la liaison au service de lecture puis la déclaration des lectures
+     * à Jellyfin. Appelé une seule fois, au démarrage de l'activité.
+     */
+    fun start() {
+        player.connect()
+        reporter.start(appScope)
     }
 
     /** Convertit un élément Jellyfin en charge utile lisible par le lecteur. */

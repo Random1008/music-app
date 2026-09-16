@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,11 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -29,10 +35,12 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +58,8 @@ import coil3.compose.AsyncImage
 import fr.hermesmusic.core.AppGraph
 import fr.hermesmusic.core.Nocturne
 import fr.hermesmusic.core.kicker
+import fr.hermesmusic.player.QueueEntry
+import kotlinx.coroutines.launch
 
 /** Libellé de durée à partir de millisecondes. */
 fun fmtMs(ms: Long): String {
@@ -65,6 +75,20 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
     var dragValue by remember { mutableFloatStateOf(0f) }
     var shuffle by remember { mutableStateOf(false) }
     var repeatMode by remember { mutableStateOf(Player.REPEAT_MODE_OFF) }
+    var favorite by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // État favori du morceau en cours : demandé au serveur (source de vérité).
+    LaunchedEffect(s.itemId) {
+        if (s.itemId.isBlank()) {
+            favorite = false
+            return@LaunchedEffect
+        }
+        favorite = runCatching {
+            graph.repo.item(s.itemId).UserData?.IsFavorite == true
+        }.getOrDefault(false)
+    }
 
     val duration = s.durationMs.coerceAtLeast(1)
     val progress = if (dragging) dragValue else (s.positionMs.toFloat() / duration).coerceIn(0f, 1f)
@@ -101,7 +125,18 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
                 Spacer(Modifier.weight(1f))
                 Text("LECTURE", style = kicker(), color = Nocturne.Dim2)
                 Spacer(Modifier.weight(1f))
-                Box(Modifier.size(48.dp))
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clickable { showQueue = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.PlaylistPlay,
+                        contentDescription = "File d'attente",
+                        tint = Nocturne.Dim,
+                    )
+                }
             }
 
             Column(
@@ -166,7 +201,10 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(fmtMs(if (dragging) (dragValue * duration).toLong() else s.positionMs), color = Nocturne.Dim2, fontSize = 11.sp)
+                    Text(
+                        fmtMs(if (dragging) (dragValue * duration).toLong() else s.positionMs),
+                        color = Nocturne.Dim2, fontSize = 11.sp,
+                    )
                     Text(fmtMs(s.durationMs), color = Nocturne.Dim2, fontSize = 11.sp)
                 }
 
@@ -214,14 +252,94 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 26.dp),
+                    .padding(bottom = 24.dp),
                 horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Icon(
+                    if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
+                    tint = if (favorite) Nocturne.Accent else Nocturne.Dim,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable {
+                            val target = !favorite
+                            favorite = target
+                            val id = s.itemId
+                            if (id.isNotBlank()) {
+                                scope.launch { runCatching { graph.repo.setFavorite(id, target) } }
+                            }
+                        },
+                )
+                Spacer(Modifier.width(14.dp))
                 Text(
                     if (s.queueSize > 1) "${s.queueSize} morceaux dans la file" else "1 morceau dans la file",
                     style = kicker(),
                     color = Nocturne.Dim2,
                 )
+            }
+        }
+
+        if (showQueue) {
+            QueueOverlay(graph, s.queue, s.itemId) { showQueue = false }
+        }
+    }
+}
+
+/** File d'attente : voir ce qui va suivre et sauter directement à un morceau. */
+@Composable
+private fun QueueOverlay(
+    graph: AppGraph,
+    queue: List<QueueEntry>,
+    currentId: String,
+    onClose: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().background(Nocturne.Bg)) {
+        Column(Modifier.fillMaxSize()) {
+            DetailBar(label = "FILE D'ATTENTE", onBack = onClose)
+            if (queue.isEmpty()) {
+                EmptyState("File vide", "Lance un album ou une liste pour la remplir.")
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 28.dp),
+                ) {
+                    itemsIndexed(queue, key = { _, e -> "${e.index}-${e.id}" }) { _, e ->
+                        val current = e.id == currentId
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { graph.player.playAt(e.index); onClose() }
+                                .padding(horizontal = 20.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "%02d".format(e.index + 1),
+                                color = if (current) Nocturne.Accent else Nocturne.Dim2,
+                                fontSize = 11.5.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                modifier = Modifier.width(28.dp),
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    e.title.ifBlank { "—" },
+                                    color = if (current) Nocturne.Accent else Nocturne.Ink,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                )
+                                Text(e.artist, color = Nocturne.Dim, fontSize = 11.5.sp, maxLines = 1)
+                            }
+                            if (current) {
+                                Icon(
+                                    Icons.Filled.PlayArrow,
+                                    contentDescription = "En cours",
+                                    tint = Nocturne.Accent,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

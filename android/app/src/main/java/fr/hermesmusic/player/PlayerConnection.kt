@@ -18,9 +18,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Une entrée de la file de lecture, telle qu'affichée à l'utilisateur. */
+data class QueueEntry(
+    val index: Int,
+    val id: String,
+    val title: String,
+    val artist: String,
+)
+
 /** État du lecteur exposé à l'interface. */
 data class PlayerUiState(
     val hasItem: Boolean = false,
+    /** Identifiant Jellyfin du morceau en cours (sert aussi à déclarer la lecture). */
+    val itemId: String = "",
     val title: String = "",
     val artist: String = "",
     val artworkUrl: String? = null,
@@ -29,6 +39,7 @@ data class PlayerUiState(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val queueSize: Int = 0,
+    val queue: List<QueueEntry> = emptyList(),
 )
 
 /**
@@ -103,12 +114,22 @@ class PlayerConnection(
     }
 
     fun next() = controller?.seekToNextMediaItem()
+
     fun previous() {
         val c = controller ?: return
         if (c.currentPosition > 4_000) c.seekTo(0) else c.seekToPreviousMediaItem()
     }
 
     fun seekTo(ms: Long) = controller?.seekTo(ms)
+
+    /** Saute directement à l'entrée [index] de la file (clic dans la file). */
+    fun playAt(index: Int) {
+        val c = controller ?: return
+        if (index !in 0 until c.mediaItemCount) return
+        c.seekTo(index, 0L)
+        c.play()
+        refresh()
+    }
 
     fun setShuffle(on: Boolean) {
         controller?.shuffleModeEnabled = on
@@ -137,8 +158,10 @@ class PlayerConnection(
     private fun refresh() {
         val c = controller ?: return
         val md = c.mediaMetadata
+        val count = c.mediaItemCount
         _state.value = PlayerUiState(
-            hasItem = c.mediaItemCount > 0,
+            hasItem = count > 0,
+            itemId = c.currentMediaItem?.mediaId.orEmpty(),
             title = md.title?.toString().orEmpty(),
             artist = md.artist?.toString().orEmpty(),
             artworkUrl = md.artworkUri?.toString(),
@@ -146,7 +169,21 @@ class PlayerConnection(
             isBuffering = c.playbackState == Player.STATE_BUFFERING,
             positionMs = c.currentPosition.coerceAtLeast(0),
             durationMs = c.duration.takeIf { it > 0 } ?: 0L,
-            queueSize = c.mediaItemCount,
+            queueSize = count,
+            queue = readQueue(c, count),
         )
     }
+
+    private fun readQueue(c: MediaController, count: Int): List<QueueEntry> =
+        runCatching {
+            (0 until count).map { i ->
+                val item = c.getMediaItemAt(i)
+                QueueEntry(
+                    index = i,
+                    id = item.mediaId,
+                    title = item.mediaMetadata.title?.toString().orEmpty(),
+                    artist = item.mediaMetadata.artist?.toString().orEmpty(),
+                )
+            }
+        }.getOrDefault(emptyList())
 }

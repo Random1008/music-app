@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import fr.hermesmusic.core.AppGraph
+import fr.hermesmusic.core.Detail
 import fr.hermesmusic.core.Nocturne
 import fr.hermesmusic.core.kicker
 
@@ -54,6 +58,7 @@ fun Shell(graph: AppGraph) {
     var tab by remember { mutableIntStateOf(0) }
     var showPlayer by remember { mutableStateOf(false) }
     val player by graph.player.state.collectAsStateWithLifecycle()
+    val detail by graph.detail.collectAsStateWithLifecycle()
 
     val tabs = listOf(
         Tab("Accueil", Icons.Filled.Home),
@@ -106,8 +111,15 @@ fun Shell(graph: AppGraph) {
             }
         }
 
-        // Lecteur plein écran par-dessus le reste (il ne remplace pas les écrans :
-        // le lecteur continue de tourner de toute façon).
+        // Page album / artiste, empilée par-dessus les onglets.
+        when (val d = detail) {
+            is Detail.Album -> AlbumDetail(graph, d.id) { graph.closeDetail() }
+            is Detail.Artist -> ArtistDetail(graph, d.id) { graph.closeDetail() }
+            null -> Unit
+        }
+
+        // Lecteur plein écran par-dessus tout le reste (il ne remplace pas les
+        // écrans : le lecteur continue de tourner de toute façon).
         if (showPlayer && player.hasItem) {
             PlayerScreen(graph) { showPlayer = false }
         }

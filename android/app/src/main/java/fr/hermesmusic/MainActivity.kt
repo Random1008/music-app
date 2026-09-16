@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         val graph = (application as HermesApp).graph
         // On se connecte au service de lecture dès le démarrage : comme ça, si
         // une musique joue déjà, l'interface la retrouve telle quelle.
-        graph.player.connect()
+        graph.start()
 
         setContent {
             HermesTheme {
