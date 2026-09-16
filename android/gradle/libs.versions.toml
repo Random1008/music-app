@@ -20,6 +20,7 @@ okhttp = "5.5.0"
 serializationJson = "1.11.0"
 coil = "3.6.2"
 datastore = "1.2.1"
+palette = "1.0.0"
 junit = "4.13.2"
 coroutinesTest = "1.10.2"
 
@@ -39,6 +40,11 @@ compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Extraction de la couleur dominante d'une pochette (fond dégradé des pages
+# album/artiste et du lecteur). 1.0.0 = dernière STABLE ; 1.1.0-alpha01 existe
+# mais on ne prend pas d'alpha sans nécessité.
+androidx-palette = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
 
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }

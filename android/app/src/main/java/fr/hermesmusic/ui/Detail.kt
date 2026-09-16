@@ -2,7 +2,6 @@ package fr.hermesmusic.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,13 +16,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,7 +49,7 @@ import fr.hermesmusic.network.JfItem
 import kotlinx.coroutines.launch
 
 /* ------------------------------------------------------------------ */
-/* Barre supérieure commune aux écrans de détail                        */
+/* Éléments communs aux pages de détail                                 */
 /* ------------------------------------------------------------------ */
 
 @Composable
@@ -86,29 +85,58 @@ fun DetailBar(
     }
 }
 
-/** Bouton en gélule (Lecture / Aléatoire). 48dp de haut : cible tactile confortable. */
+/** Grand bouton de lecture rond : on le vise sans regarder. */
 @Composable
-fun PillButton(
-    label: String,
-    filled: Boolean,
+fun BigPlayButton(
+    description: String = "Lecture",
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Text(
-        label,
-        color = when {
-            !enabled -> Nocturne.Dim2
-            filled -> Nocturne.OnAccent
-            else -> Nocturne.Ink
-        },
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(if (filled) Nocturne.Accent else Nocturne.Surface2)
-            .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 24.dp, vertical = 15.dp),
-    )
+    Box(
+        Modifier
+            .size(58.dp)
+            .clip(CircleShape)
+            .background(if (enabled) Nocturne.Accent else Nocturne.Surface2)
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.PlayArrow,
+            contentDescription = description,
+            tint = if (enabled) Nocturne.OnAccent else Nocturne.Dim2,
+            modifier = Modifier.size(30.dp),
+        )
+    }
+}
+
+/**
+ * Rangée d'actions d'une page de détail : les actions secondaires à gauche,
+ * puis lecture aléatoire et le grand bouton lecture à droite.
+ */
+@Composable
+fun DetailActions(
+    enabled: Boolean,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    leading: @Composable () -> Unit = {},
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        leading()
+        Spacer(Modifier.weight(1f))
+        ActionIcon(
+            icon = Icons.Filled.Shuffle,
+            description = "Aléatoire",
+            tint = Nocturne.Ink,
+            enabled = enabled,
+        ) { onShuffle() }
+        Spacer(Modifier.width(6.dp))
+        BigPlayButton(enabled = enabled) { onPlay() }
+    }
 }
 
 /** Lance une liste en lecture aléatoire (mélange activé + départ au hasard). */
@@ -153,19 +181,14 @@ private fun NumberedRow(
             Text(track.artistLine, color = Nocturne.Dim, fontSize = 11.5.sp, maxLines = 1)
         }
         if (downloaded) {
-            Text(
-                "↓",
-                color = Nocturne.Dim2,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(end = 8.dp),
-            )
+            Text("↓", color = Nocturne.Dim2, fontSize = 13.sp, modifier = Modifier.padding(end = 8.dp))
         }
         Text(fmtDuration(track.durationSeconds), color = Nocturne.Dim2, fontSize = 11.5.sp)
     }
 }
 
 /* ------------------------------------------------------------------ */
-/* Page ALBUM (spec §12)                                                */
+/* Page ALBUM                                                           */
 /* ------------------------------------------------------------------ */
 
 @Composable
@@ -190,6 +213,7 @@ fun AlbumDetail(graph: AppGraph, albumId: String, onBack: () -> Unit) {
     val list = tracks ?: emptyList()
     val downloadedIds = downloads.map { it.itemId }.toSet()
     val downloadedCount = list.count { it.Id in downloadedIds }
+    val allDownloaded = list.isNotEmpty() && downloadedCount == list.size
     val meta = buildString {
         album?.ProductionYear?.let { append("$it · ") }
         append("${list.size} morceaux")
@@ -197,36 +221,28 @@ fun AlbumDetail(graph: AppGraph, albumId: String, onBack: () -> Unit) {
         if (minutes > 0) append(" · $minutes min")
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(rememberArtworkBrush(graph, album?.let { graph.repo.imageUrl(it, 400) })),
+    ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
             item {
                 Column(Modifier.fillMaxWidth()) {
-                    DetailBar(
-                        label = "ALBUM",
-                        onBack = onBack,
-                        trailing = {
-                            FavoriteButton(favorite) {
-                                val target = !favorite
-                                favorite = target
-                                scope.launch {
-                                    runCatching { graph.repo.setFavorite(albumId, target) }
-                                }
-                            }
-                        },
-                    )
+                    DetailBar(label = "ALBUM", onBack = onBack)
 
                     Box(
                         Modifier.fillMaxWidth().padding(top = 6.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        album?.let { Cover(graph, it, 206.dp) }
+                        album?.let { Cover(graph, it, 200.dp) }
                     }
 
                     Spacer(Modifier.height(20.dp))
                     Text(
                         album?.Name ?: "…",
                         color = Nocturne.Ink,
-                        fontSize = 21.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
@@ -249,40 +265,52 @@ fun AlbumDetail(graph: AppGraph, albumId: String, onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(Modifier.height(20.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        PillButton("Lecture", filled = true) { graph.play(list, 0) }
-                        Spacer(Modifier.width(10.dp))
-                        PillButton("Aléatoire", filled = false) { playShuffled(graph, list) }
-                    }
+                    DetailActions(
+                        enabled = list.isNotEmpty(),
+                        onPlay = { graph.play(list, 0) },
+                        onShuffle = { playShuffled(graph, list) },
+                        leading = {
+                            Row {
+                                ActionIcon(
+                                    icon = if (favorite) {
+                                        Icons.Filled.Favorite
+                                    } else {
+                                        Icons.Filled.FavoriteBorder
+                                    },
+                                    description = if (favorite) {
+                                        "Retirer des favoris"
+                                    } else {
+                                        "Ajouter aux favoris"
+                                    },
+                                    tint = if (favorite) Nocturne.Accent else Nocturne.Dim,
+                                ) {
+                                    val target = !favorite
+                                    favorite = target
+                                    scope.launch {
+                                        runCatching { graph.repo.setFavorite(albumId, target) }
+                                    }
+                                }
+                                ActionIcon(
+                                    icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                    description = "Ajouter à une playlist",
+                                    enabled = list.isNotEmpty(),
+                                ) { addingToPlaylist = true }
+                                ActionIcon(
+                                    icon = Icons.Filled.FileDownload,
+                                    description = if (allDownloaded) {
+                                        "Album déjà téléchargé"
+                                    } else {
+                                        "Télécharger l'album"
+                                    },
+                                    tint = if (allDownloaded) Nocturne.Accent else Nocturne.Dim,
+                                    enabled = list.isNotEmpty() && !allDownloaded,
+                                ) { graph.download(list) }
+                            }
+                        },
+                    )
 
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        ActionIcon(
-                            Icons.AutoMirrored.Filled.PlaylistAdd,
-                            "Ajouter à une playlist",
-                            enabled = list.isNotEmpty(),
-                        ) { addingToPlaylist = true }
-
-                        ActionIcon(
-                            Icons.Filled.FileDownload,
-                            if (downloadedCount == list.size && list.isNotEmpty()) {
-                                "Album téléchargé"
-                            } else {
-                                "Télécharger l'album"
-                            },
-                            tint = if (downloadedCount == list.size && list.isNotEmpty()) {
-                                Nocturne.Accent
-                            } else {
-                                Nocturne.Dim
-                            },
-                            enabled = list.isNotEmpty() && downloadedCount < list.size,
-                        ) { graph.download(list) }
-                    }
-
-                    if (downloadProgress.running) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
+                    when {
+                        downloadProgress.running -> Text(
                             "Téléchargement ${downloadProgress.done}/${downloadProgress.total} · " +
                                 downloadProgress.currentTitle,
                             style = kicker(),
@@ -291,14 +319,17 @@ fun AlbumDetail(graph: AppGraph, albumId: String, onBack: () -> Unit) {
                             maxLines = 1,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         )
-                    } else if (list.isNotEmpty() && downloadedCount > 0) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            if (downloadedCount == list.size) {
-                                "Album disponible hors-ligne"
-                            } else {
-                                "$downloadedCount/${list.size} morceaux hors-ligne"
-                            },
+
+                        allDownloaded -> Text(
+                            "Album disponible hors-ligne",
+                            style = kicker(),
+                            color = Nocturne.Dim2,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+
+                        downloadedCount > 0 -> Text(
+                            "$downloadedCount/${list.size} morceaux hors-ligne",
                             style = kicker(),
                             color = Nocturne.Dim2,
                             textAlign = TextAlign.Center,
@@ -306,7 +337,7 @@ fun AlbumDetail(graph: AppGraph, albumId: String, onBack: () -> Unit) {
                         )
                     }
 
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
             }
 
@@ -333,18 +364,8 @@ fun AlbumDetail(graph: AppGraph, albumId: String, onBack: () -> Unit) {
     }
 }
 
-@Composable
-private fun FavoriteButton(favorite: Boolean, onClick: () -> Unit) {
-    ActionIcon(
-        icon = if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-        description = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
-        tint = if (favorite) Nocturne.Accent else Nocturne.Dim,
-        onClick = onClick,
-    )
-}
-
 /* ------------------------------------------------------------------ */
-/* Page ARTISTE (spec §13)                                              */
+/* Page ARTISTE                                                         */
 /* ------------------------------------------------------------------ */
 
 @Composable
@@ -369,7 +390,13 @@ fun ArtistDetail(graph: AppGraph, artistId: String, onBack: () -> Unit) {
     // premier album plutôt que d'afficher un rond vide.
     val imageItem = artist?.takeIf { it.hasCover } ?: albumList.firstOrNull { it.hasCover }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                rememberArtworkBrush(graph, imageItem?.let { graph.repo.imageUrl(it, 400) })
+            ),
+    ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
             item {
                 Column(Modifier.fillMaxWidth()) {
@@ -380,11 +407,11 @@ fun ArtistDetail(graph: AppGraph, artistId: String, onBack: () -> Unit) {
                         contentAlignment = Alignment.Center,
                     ) {
                         if (imageItem != null) {
-                            Cover(graph, imageItem, 150.dp, round = true)
+                            Cover(graph, imageItem, 152.dp, round = true)
                         } else {
                             Box(
                                 Modifier
-                                    .size(150.dp)
+                                    .size(152.dp)
                                     .clip(CircleShape)
                                     .background(Nocturne.Surface2),
                             )
@@ -395,7 +422,7 @@ fun ArtistDetail(graph: AppGraph, artistId: String, onBack: () -> Unit) {
                     Text(
                         artist?.Name ?: "…",
                         color = Nocturne.Ink,
-                        fontSize = 21.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
@@ -409,29 +436,25 @@ fun ArtistDetail(graph: AppGraph, artistId: String, onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        PillButton(
-                            "Aléatoire",
-                            filled = true,
-                            enabled = trackList.isNotEmpty(),
-                        ) { playShuffled(graph, trackList) }
-                        Spacer(Modifier.width(10.dp))
-                        PillButton(
-                            "Tout télécharger",
-                            filled = false,
-                            enabled = trackList.isNotEmpty(),
-                        ) { graph.download(trackList) }
-                    }
-
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        ActionIcon(
-                            Icons.AutoMirrored.Filled.PlaylistAdd,
-                            "Ajouter à une playlist",
-                            enabled = trackList.isNotEmpty(),
-                        ) { addingToPlaylist = true }
-                    }
+                    DetailActions(
+                        enabled = trackList.isNotEmpty(),
+                        onPlay = { graph.play(trackList, 0) },
+                        onShuffle = { playShuffled(graph, trackList) },
+                        leading = {
+                            Row {
+                                ActionIcon(
+                                    icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                    description = "Ajouter à une playlist",
+                                    enabled = trackList.isNotEmpty(),
+                                ) { addingToPlaylist = true }
+                                ActionIcon(
+                                    icon = Icons.Filled.FileDownload,
+                                    description = "Télécharger les titres",
+                                    enabled = trackList.isNotEmpty(),
+                                ) { graph.download(trackList) }
+                            }
+                        },
+                    )
                     Spacer(Modifier.height(6.dp))
                 }
             }

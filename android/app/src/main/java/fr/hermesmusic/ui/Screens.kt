@@ -46,8 +46,10 @@ import coil3.compose.AsyncImage
 import fr.hermesmusic.core.AppGraph
 import fr.hermesmusic.core.Nocturne
 import fr.hermesmusic.core.kicker
+import fr.hermesmusic.data.DownloadEntry
 import fr.hermesmusic.network.JfItem
 import kotlinx.coroutines.launch
+import java.time.LocalTime
 
 /** Pochette distante, taille plafonnée (jamais de pleine résolution). */
 @Composable
@@ -72,11 +74,18 @@ fun Cover(graph: AppGraph, item: JfItem, size: Dp, round: Boolean = false) {
 }
 
 /* ------------------------------------------------------------------ */
-/* ACCUEIL (spec §10)                                                   */
+/* ACCUEIL                                                              */
 /* ------------------------------------------------------------------ */
 
+/** Salutation selon l'heure : on ouvre l'application à toute heure. */
+private fun greetingFor(hour: Int): String = when (hour) {
+    in 5..11 -> "Bonjour"
+    in 12..17 -> "Bon après-midi"
+    else -> "Bonsoir"
+}
+
 @Composable
-fun HomeTab(graph: AppGraph) {
+fun HomeTab(graph: AppGraph, onOpenSearch: () -> Unit) {
     var albums by remember { mutableStateOf<List<JfItem>?>(null) }
     var added by remember { mutableStateOf<List<JfItem>>(emptyList()) }
     var resume by remember { mutableStateOf<List<JfItem>>(emptyList()) }
@@ -89,7 +98,7 @@ fun HomeTab(graph: AppGraph) {
     LaunchedEffect(Unit) {
         runCatching {
             val recentAlbums = graph.repo.recentAlbums(limit = 12)
-            added = graph.repo.recentTracks(limit = 8).Items
+            added = graph.repo.recentTracks(limit = 6).Items
             resume = graph.repo.resumeAudio(limit = 5).Items
             played = graph.repo.recentlyPlayed(limit = 8).Items
             favorites = graph.repo.favorites().Items.take(12)
@@ -102,24 +111,23 @@ fun HomeTab(graph: AppGraph) {
         }.onFailure { error = it.message ?: "Erreur réseau" }
     }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 18.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
         item {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 8.dp, top = 22.dp),
+                    .padding(start = 20.dp, end = 8.dp, top = 22.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Bonsoir", color = Nocturne.Dim, fontSize = 12.sp)
                     Text(
-                        "Ta bibliothèque",
+                        greetingFor(LocalTime.now().hour),
                         color = Nocturne.Ink,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Medium,
                     )
                     if (counts.isNotEmpty()) {
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(5.dp))
                         Text(counts, style = kicker(), color = Nocturne.Accent)
                     }
                 }
@@ -134,43 +142,15 @@ fun HomeTab(graph: AppGraph) {
         error?.let { item { EmptyState("Bibliothèque indisponible", it) } }
         if (albums == null && error == null) item { LoadingState() }
 
-        // --- Reprendre la lecture (alimenté par l'historique Jellyfin) ---
+        // --- Reprendre la lecture (là où on s'est arrêté) ---
         resume.firstOrNull()?.let { first ->
-            item { SectionHeader("Reprendre la lecture") }
-            item {
-                ResumeCard(graph, first) {
-                    graph.play(resume, 0)
-                }
-            }
-            if (resume.size > 1) {
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        itemsIndexed(resume.drop(1), key = { _, it -> it.Id }) { index, t ->
-                            Column(
-                                Modifier
-                                    .width(104.dp)
-                                    .clickable { graph.play(resume, index + 1) },
-                            ) {
-                                Cover(graph, t, 104.dp)
-                                Spacer(Modifier.height(7.dp))
-                                Text(t.Name ?: "", color = Nocturne.Ink, fontSize = 12.sp, maxLines = 1)
-                                Text(t.artistLine, color = Nocturne.Dim, fontSize = 11.sp, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            }
+            item { ResumeCard(graph, first) { graph.play(resume, 0) } }
         }
 
-        // --- Récemment écouté ---
+        // --- Grille compacte : les six derniers morceaux écoutés ---
         if (played.isNotEmpty()) {
             item { SectionHeader("Récemment écouté") }
-            itemsIndexed(played, key = { _, it -> "p" + it.Id }) { index, t ->
-                TrackRow(graph, t) { graph.play(played, index) }
-            }
+            item { RecentGrid(graph, played.take(6)) { index -> graph.play(played, index) } }
         }
 
         // --- Albums récents ---
@@ -185,7 +165,6 @@ fun HomeTab(graph: AppGraph) {
                         Column(
                             Modifier
                                 .width(132.dp)
-                                // Un album s'ouvre : c'est sa page qui propose Lecture/Aléatoire.
                                 .clickable { graph.openAlbum(album.Id, album.Name ?: "") },
                         ) {
                             Cover(graph, album, 132.dp)
@@ -195,6 +174,35 @@ fun HomeTab(graph: AppGraph) {
                                 album.AlbumArtist ?: album.artistLine,
                                 color = Nocturne.Dim,
                                 fontSize = 11.5.sp,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Playlists ---
+        if (playlists.isNotEmpty()) {
+            item { SectionHeader("Tes playlists") }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    itemsIndexed(playlists, key = { _, it -> it.Id }) { _, pl ->
+                        Column(
+                            Modifier
+                                .width(120.dp)
+                                .clickable { graph.openPlaylist(pl.Id, pl.Name ?: "") },
+                        ) {
+                            Cover(graph, pl, 120.dp)
+                            Spacer(Modifier.height(8.dp))
+                            Text(pl.Name ?: "", color = Nocturne.Ink, fontSize = 12.5.sp, maxLines = 1)
+                            Text(
+                                "${pl.ChildCount ?: 0} morceaux",
+                                color = Nocturne.Dim,
+                                fontSize = 11.sp,
                                 maxLines = 1,
                             )
                         }
@@ -227,16 +235,6 @@ fun HomeTab(graph: AppGraph) {
             }
         }
 
-        // --- Playlists ---
-        if (playlists.isNotEmpty()) {
-            item { SectionHeader("Playlists") }
-            itemsIndexed(playlists, key = { _, it -> "l" + it.Id }) { _, pl ->
-                TrackRow(graph, pl, subtitle = "${pl.ChildCount ?: 0} morceaux") {
-                    graph.openPlaylist(pl.Id, pl.Name ?: "")
-                }
-            }
-        }
-
         // --- Récemment ajouté ---
         if (added.isNotEmpty()) {
             item { SectionHeader("Récemment ajouté") }
@@ -247,21 +245,62 @@ fun HomeTab(graph: AppGraph) {
     }
 }
 
-/** Grande carte « reprendre » avec la pochette et la progression. */
+/**
+ * Grille compacte « récemment écouté » : six vignettes sur deux colonnes, la
+ * pochette à gauche et le titre à droite sur un fond discret.
+ */
+@Composable
+private fun RecentGrid(graph: AppGraph, items: List<JfItem>, onPlay: (Int) -> Unit) {
+    Column(
+        Modifier.padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items.chunked(2).forEachIndexed { rowIndex, rowItems ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                rowItems.forEachIndexed { columnIndex, item ->
+                    val index = rowIndex * 2 + columnIndex
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .height(54.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Nocturne.Surface2)
+                            .clickable { onPlay(index) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Cover(graph, item, 54.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            item.Name ?: "",
+                            color = Nocturne.Ink,
+                            fontSize = 12.5.sp,
+                            maxLines = 2,
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        )
+                    }
+                }
+                // Rangée impaire : on garde la largeur pour aligner les colonnes.
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** Carte « reprendre » avec la pochette et la progression. */
 @Composable
 private fun ResumeCard(graph: AppGraph, item: JfItem, onPlay: () -> Unit) {
     val pct = item.UserData?.PlayedPercentage?.toInt()
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 20.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(Nocturne.Surface2)
             .clickable { onPlay() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Cover(graph, item, 62.dp)
+        Cover(graph, item, 58.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(item.Name ?: "", color = Nocturne.Ink, fontSize = 14.sp, maxLines = 1)
@@ -283,7 +322,7 @@ private fun ResumeCard(graph: AppGraph, item: JfItem, onPlay: () -> Unit) {
                 Icons.Filled.PlayArrow,
                 contentDescription = "Reprendre la lecture",
                 tint = Nocturne.OnAccent,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -337,7 +376,7 @@ fun TrackRow(
 }
 
 /* ------------------------------------------------------------------ */
-/* RECHERCHE (spec §11)                                                 */
+/* RECHERCHE                                                            */
 /* ------------------------------------------------------------------ */
 
 @Composable
@@ -347,6 +386,11 @@ fun SearchTab(graph: AppGraph) {
     var busy by remember { mutableStateOf(false) }
     var searched by remember { mutableStateOf(false) }
     var filter by remember { mutableIntStateOf(0) }
+    var topArtists by remember { mutableStateOf<List<JfItem>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        topArtists = runCatching { graph.repo.artists(limit = 8).Items }.getOrDefault(emptyList())
+    }
 
     LaunchedEffect(query) {
         if (query.trim().length < 2) {
@@ -403,9 +447,9 @@ fun SearchTab(graph: AppGraph) {
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(labels) { index, (label, count) ->
+                itemsIndexed(labels) { index, entry ->
                     Text(
-                        "$label $count",
+                        "${entry.first} ${entry.second}",
                         color = if (filter == index) Nocturne.OnAccent else Nocturne.Dim,
                         fontSize = 12.sp,
                         modifier = Modifier
@@ -420,10 +464,54 @@ fun SearchTab(graph: AppGraph) {
 
         when {
             busy -> LoadingState()
-            query.trim().length < 2 -> EmptyState(
-                "Cherche dans ta musique",
-                "Titres, albums et artistes de ta bibliothèque Jellyfin.",
-            )
+
+            // Champ vide : on propose à parcourir, comme une page « tout afficher ».
+            query.trim().length < 2 -> {
+                if (topArtists.isEmpty()) {
+                    EmptyState(
+                        "Cherche dans ta musique",
+                        "Titres, albums et artistes de ta bibliothèque Jellyfin.",
+                    )
+                } else {
+                    LazyColumn(
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 20.dp),
+                    ) {
+                        item { SectionHeader("Parcourir") }
+                        itemsIndexed(topArtists.chunked(2)) { _, rowArtists ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                rowArtists.forEach { artist ->
+                                    Column(
+                                        Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                graph.openArtist(artist.Id, artist.Name ?: "")
+                                            }
+                                            .padding(vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Cover(graph, artist, 108.dp, round = true)
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(
+                                            artist.Name ?: "",
+                                            color = Nocturne.Ink,
+                                            fontSize = 12.5.sp,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                                if (rowArtists.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
 
             results.isEmpty() && searched -> EmptyState(
                 "Aucun résultat",
@@ -461,168 +549,182 @@ fun SearchTab(graph: AppGraph) {
 }
 
 /* ------------------------------------------------------------------ */
-/* BIBLIOTHÈQUE (spec §10/§17)                                          */
+/* BIBLIOTHÈQUE — albums, artistes, morceaux, playlists, favoris,       */
+/* téléchargements                                                      */
 /* ------------------------------------------------------------------ */
+
+private val LIBRARY_FILTERS = listOf(
+    "Albums",
+    "Artistes",
+    "Morceaux",
+    "Playlists",
+    "Favoris",
+    "Téléchargés",
+)
+
+private const val FILTER_DOWNLOADS = 5
 
 @Composable
 fun LibraryTab(graph: AppGraph) {
     var mode by remember { mutableIntStateOf(0) }
     var items by remember { mutableStateOf<List<JfItem>?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var reloadKey by remember { mutableIntStateOf(0) }
     val downloads by graph.downloadEntries.collectAsStateWithLifecycle()
-    val labels = listOf("Albums", "Artistes", "Morceaux", "Favoris")
     val downloadedIds = remember(downloads) { downloads.map { it.itemId }.toSet() }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(mode) {
+    LaunchedEffect(mode, reloadKey) {
+        if (mode == FILTER_DOWNLOADS) {
+            // Source locale : rien à demander au serveur.
+            items = emptyList()
+            return@LaunchedEffect
+        }
         items = null
         items = runCatching {
             when (mode) {
                 0 -> graph.repo.albums(limit = 60).Items
                 1 -> graph.repo.artists(limit = 60).Items
                 2 -> graph.repo.tracks(limit = 60).Items
+                3 -> graph.repo.playlists().Items
                 else -> graph.repo.favorites().Items
             }
-        }.getOrDefault(emptyList())
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        LazyRow(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            itemsIndexed(labels) { index, label ->
-                Text(
-                    label,
-                    color = if (mode == index) Nocturne.OnAccent else Nocturne.Dim,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(if (mode == index) Nocturne.Accent else Nocturne.Surface2)
-                        .clickable { mode = index }
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                )
-            }
-        }
-
-        when {
-            items == null -> LoadingState()
-            items!!.isEmpty() -> EmptyState(
-                if (mode == 3) "Aucun favori" else "Rien à afficher",
-                if (mode == 3) {
-                    "Touche le cœur sur un album ou dans le lecteur pour en ajouter."
-                } else {
-                    "Cette section est vide."
-                },
-            )
-
-            else -> {
-                val list = items!!
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 18.dp)) {
-                    itemsIndexed(list, key = { _, it -> it.Id }) { index, item ->
-                        when (mode) {
-                            0 -> TrackRow(
-                                graph,
-                                item,
-                                subtitle = item.AlbumArtist ?: item.artistLine,
-                            ) { graph.openAlbum(item.Id, item.Name ?: "") }
-
-                            1 -> TrackRow(graph, item, subtitle = "Artiste", round = true) {
-                                graph.openArtist(item.Id, item.Name ?: "")
-                            }
-
-                            else -> TrackRow(
-                                graph,
-                                item,
-                                playing = false,
-                                downloaded = item.Id in downloadedIds,
-                            ) { graph.play(list, index) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* PLAYLISTS (spec §16)                                                 */
-/* ------------------------------------------------------------------ */
-
-@Composable
-fun PlaylistsTab(graph: AppGraph) {
-    var playlists by remember { mutableStateOf<List<JfItem>?>(null) }
-    var creating by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var reloadKey by remember { mutableIntStateOf(0) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(reloadKey) {
-        playlists = runCatching { graph.repo.playlists().Items }
-            .onFailure { error = it.message ?: "Erreur réseau" }
+        }.onFailure { error = it.message ?: "Erreur réseau" }
             .getOrDefault(emptyList())
     }
 
     Box(Modifier.fillMaxSize()) {
-        when {
-            playlists == null -> LoadingState()
-            else -> {
-                val list = playlists!!
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 18.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 20.dp, top = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Ta bibliothèque",
+                        color = Nocturne.Ink,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Nocturne.Accent)
+                            .clickable { creating = true }
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = null,
+                            tint = Nocturne.OnAccent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Playlist",
+                            color = Nocturne.OnAccent,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+
+            item {
+                LazyRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(LIBRARY_FILTERS) { index, label ->
+                        Text(
+                            label,
+                            color = if (mode == index) Nocturne.OnAccent else Nocturne.Dim,
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (mode == index) Nocturne.Accent else Nocturne.Surface2)
+                                .clickable { mode = index }
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
+                        )
+                    }
+                }
+            }
+
+            error?.let { item { EmptyState("Bibliothèque indisponible", it) } }
+
+            if (mode == FILTER_DOWNLOADS) {
+                if (downloads.isEmpty()) {
                     item {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp, top = 18.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                if (list.isEmpty()) "Playlists" else "${list.size} playlists",
-                                color = Nocturne.Ink,
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Row(
-                                Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Nocturne.Accent)
-                                    .clickable { creating = true }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    Icons.Filled.Add,
-                                    contentDescription = null,
-                                    tint = Nocturne.OnAccent,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    "Nouvelle",
-                                    color = Nocturne.OnAccent,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
+                        EmptyState(
+                            "Rien en local",
+                            "Depuis un album ou une page artiste, touche l'icône de " +
+                                "téléchargement pour garder les morceaux sur le téléphone.",
+                        )
+                    }
+                } else {
+                    item {
+                        Text(
+                            "${downloads.size} morceaux · ${fmtBytes(downloads.sumOf { it.sizeBytes })}",
+                            style = kicker(),
+                            color = Nocturne.Accent,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        )
+                    }
+                    itemsIndexed(downloads, key = { _, it -> it.itemId }) { index, entry ->
+                        DeviceRow(entry) { graph.playDownloads(downloads, index) }
+                    }
+                }
+            } else {
+                when {
+                    items == null -> item { LoadingState() }
+                    items!!.isEmpty() -> item {
+                        EmptyState(
+                            when (mode) {
+                                3 -> "Aucune playlist"
+                                4 -> "Aucun favori"
+                                else -> "Rien à afficher"
+                            },
+                            when (mode) {
+                                3 -> "Touche « Playlist » en haut pour en créer une."
+                                4 -> "Touche le cœur sur un album ou dans le lecteur."
+                                else -> "Cette section est vide."
+                            },
+                        )
+                    }
+
+                    else -> {
+                        val list = items!!
+                        itemsIndexed(list, key = { _, it -> it.Id }) { index, item ->
+                            when (mode) {
+                                0 -> TrackRow(
+                                    graph,
+                                    item,
+                                    subtitle = item.AlbumArtist ?: item.artistLine,
+                                ) { graph.openAlbum(item.Id, item.Name ?: "") }
+
+                                1 -> TrackRow(graph, item, subtitle = "Artiste", round = true) {
+                                    graph.openArtist(item.Id, item.Name ?: "")
+                                }
+
+                                3 -> TrackRow(
+                                    graph,
+                                    item,
+                                    subtitle = "${item.ChildCount ?: 0} morceaux",
+                                ) { graph.openPlaylist(item.Id, item.Name ?: "") }
+
+                                else -> TrackRow(
+                                    graph,
+                                    item,
+                                    downloaded = item.Id in downloadedIds,
+                                ) { graph.play(list, index) }
                             }
-                        }
-                    }
-
-                    error?.let { item { EmptyState("Playlists indisponibles", it) } }
-
-                    if (list.isEmpty()) {
-                        item {
-                            EmptyState(
-                                "Aucune playlist",
-                                "Touche « Nouvelle » pour en créer une, ou ajoute des morceaux " +
-                                    "depuis un album.",
-                            )
-                        }
-                    }
-
-                    itemsIndexed(list, key = { _, it -> it.Id }) { _, pl ->
-                        TrackRow(graph, pl, subtitle = "${pl.ChildCount ?: 0} morceaux") {
-                            graph.openPlaylist(pl.Id, pl.Name ?: "")
                         }
                     }
                 }
@@ -638,10 +740,45 @@ fun PlaylistsTab(graph: AppGraph) {
                     creating = false
                     scope.launch {
                         graph.createPlaylist(name)
-                            .onSuccess { reloadKey++ }
+                            .onSuccess {
+                                mode = 3
+                                reloadKey++
+                            }
                             .onFailure { error = it.message ?: "Création impossible" }
                     }
                 },
+            )
+        }
+    }
+}
+
+/** Ligne d'un morceau présent sur l'appareil. */
+@Composable
+private fun DeviceRow(entry: DownloadEntry, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 20.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(46.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Nocturne.Surface2),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("↓", color = Nocturne.Accent, fontSize = 16.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(entry.title, color = Nocturne.Ink, fontSize = 14.sp, maxLines = 1)
+            Text(
+                "${entry.artist} · ${fmtBytes(entry.sizeBytes)}",
+                color = Nocturne.Dim,
+                fontSize = 11.5.sp,
+                maxLines = 1,
             )
         }
     }

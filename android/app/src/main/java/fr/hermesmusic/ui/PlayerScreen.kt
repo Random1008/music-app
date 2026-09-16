@@ -46,8 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -92,12 +90,9 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to if (Nocturne.dark) Color(0xFF1B1D2E) else Nocturne.Surface2,
-                    0.62f to Nocturne.Bg,
-                )
-            ),
+            // Le fond du lecteur prend la couleur de la pochette en cours :
+            // chaque morceau a ainsi sa propre ambiance.
+            .background(rememberArtworkBrush(graph, s.artworkUrl, tint = 0.5f)),
     ) {
         Column(Modifier.fillMaxSize()) {
             Row(

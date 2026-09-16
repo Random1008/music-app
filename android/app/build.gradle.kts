@@ -26,8 +26,8 @@ android {
         applicationId = "fr.hermesmusic"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.6.0"
+        versionCode = 6
+        versionName = "0.7.0"
         resourceConfigurations += listOf("fr", "en")
     }
 
@@ -88,6 +88,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.palette)
 
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)

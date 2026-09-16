@@ -67,7 +67,7 @@ class AppGraph(private val context: Context) {
     companion object {
         const val CLIENT = "Hermes Music"
         const val DEVICE = "Android"
-        const val VERSION = "0.6.0"
+        const val VERSION = "0.7.0"
 
         /** Cadence d'écriture de la reprise de session. */
         private const val SESSION_SAVE_EVERY_MS = 5_000L

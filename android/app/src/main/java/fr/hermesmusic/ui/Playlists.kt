@@ -2,7 +2,6 @@ package fr.hermesmusic.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -196,17 +195,37 @@ fun PlaylistDetail(graph: AppGraph, playlistId: String, title: String, onBack: (
     val list = items ?: emptyList()
     val minutes = list.sumOf { it.durationSeconds } / 60
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                rememberArtworkBrush(
+                    graph,
+                    list.firstOrNull()?.let { graph.repo.imageUrl(it, 400) },
+                )
+            ),
+    ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
             item {
                 Column(Modifier.fillMaxWidth()) {
                     DetailBar(label = "PLAYLIST", onBack = onBack)
 
-                    Spacer(Modifier.height(10.dp))
+                    if (list.isNotEmpty()) {
+                        Box(
+                            Modifier.fillMaxWidth().padding(top = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            // Sans pochette propre, une playlist prend celle de
+                            // son premier morceau (le fond en dérive aussi).
+                            Cover(graph, list.first(), 170.dp)
+                        }
+                    }
+
+                    Spacer(Modifier.height(18.dp))
                     Text(
                         name,
                         color = Nocturne.Ink,
-                        fontSize = 21.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
@@ -224,20 +243,23 @@ fun PlaylistDetail(graph: AppGraph, playlistId: String, title: String, onBack: (
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(Modifier.height(18.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        PillButton("Lecture", filled = true) { graph.play(list, 0) }
-                        Spacer(Modifier.width(10.dp))
-                        PillButton("Aléatoire", filled = false) { playShuffled(graph, list) }
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        ActionIcon(Icons.Filled.Edit, "Renommer la playlist") { renaming = true }
-                        ActionIcon(Icons.Filled.Delete, "Supprimer la playlist") {
-                            confirmingDelete = true
-                        }
-                    }
+                    DetailActions(
+                        enabled = list.isNotEmpty(),
+                        onPlay = { graph.play(list, 0) },
+                        onShuffle = { playShuffled(graph, list) },
+                        leading = {
+                            Row {
+                                ActionIcon(
+                                    Icons.Filled.Edit,
+                                    "Renommer la playlist",
+                                ) { renaming = true }
+                                ActionIcon(
+                                    Icons.Filled.Delete,
+                                    "Supprimer la playlist",
+                                ) { confirmingDelete = true }
+                            }
+                        },
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }

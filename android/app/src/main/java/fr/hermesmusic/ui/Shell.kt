@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Pause
@@ -53,6 +52,13 @@ private data class Tab(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
 )
 
+/**
+ * Coque de l'application : trois onglets et un mini-lecteur permanent.
+ *
+ * Trois onglets plutôt que quatre : les playlists et les favoris vivent
+ * maintenant dans la Bibliothèque, à côté des albums — c'est là qu'on les
+ * cherche, et ça laisse la barre du bas respirer.
+ */
 @Composable
 fun Shell(graph: AppGraph) {
     var tab by remember { mutableIntStateOf(0) }
@@ -64,7 +70,6 @@ fun Shell(graph: AppGraph) {
         Tab("Accueil", Icons.Filled.Home),
         Tab("Recherche", Icons.Filled.Search),
         Tab("Bibliothèque", Icons.Filled.LibraryMusic),
-        Tab("Playlists", Icons.AutoMirrored.Filled.PlaylistPlay),
     )
 
     Box(Modifier.fillMaxSize()) {
@@ -84,16 +89,16 @@ fun Shell(graph: AppGraph) {
                                 label = {
                                     Text(
                                         item.label,
-                                        fontSize = 9.5.sp,
+                                        fontSize = 10.sp,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                     )
                                 },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Nocturne.Accent,
-                                    selectedTextColor = Nocturne.Accent,
+                                    selectedIconColor = Nocturne.Ink,
+                                    selectedTextColor = Nocturne.Ink,
                                     unselectedIconColor = Nocturne.Dim2,
                                     unselectedTextColor = Nocturne.Dim2,
-                                    indicatorColor = Nocturne.Surface2,
+                                    indicatorColor = Nocturne.Accent,
                                 ),
                             )
                         }
@@ -103,10 +108,9 @@ fun Shell(graph: AppGraph) {
         ) { padding ->
             Box(Modifier.padding(padding)) {
                 when (tab) {
-                    0 -> HomeTab(graph)
+                    0 -> HomeTab(graph) { tab = 1 }
                     1 -> SearchTab(graph)
-                    2 -> LibraryTab(graph)
-                    else -> PlaylistsTab(graph)
+                    else -> LibraryTab(graph)
                 }
             }
         }
