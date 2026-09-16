@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+"""music — administration de la plateforme Hermes Music depuis le terminal.
+
+    music adduser <nom> [motdepasse]   crée un compte Jellyfin et lui donne un mot de passe
+    music users                        liste les comptes
+    music passwd  <nom> [motdepasse]   change le mot de passe d'un compte
+    music deluser <nom> [-y]           supprime un compte
+    music help                         cette aide
+
+Sans mot de passe sur la ligne de commande, il est demandé masqué (rien
+n'apparaît alors dans l'historique du shell ni dans `ps`).
+
+Tout passe par l'API Jellyfin : aucun accès à la base de données du serveur,
+rien n'est modifié en dehors des comptes. La clé d'API est lue dans le .env du
+projet et n'est jamais affichée.
+"""
+
+from __future__ import annotations
+
+import getpass
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+SCRIPT = os.path.realpath(__file__)
+ROOT = os.path.dirname(os.path.dirname(SCRIPT))
+ENV_FILE = os.environ.get("MUSIC_ENV", os.path.join(ROOT, ".env"))
+
+CLIENT = "music-cli"
+
+
+# --------------------------------------------------------------------------
+# Configuration
+# --------------------------------------------------------------------------
+
+def read_env() -> tuple[str, str]:
+    """Renvoie (clé d'API, URL de base). La clé n'est jamais affichée."""
+    key = os.environ.get("JELLYFIN_API_KEY")
+    port = os.environ.get("JELLYFIN_PORT")
+    try:
+        with open(ENV_FILE, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line.startswith("JELLYFIN_API_KEY=") and not key:
+                    key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                elif line.startswith("JELLYFIN_PORT=") and not port:
+                    port = line.split("=", 1)[1].strip().strip('"').strip("'")
+    except FileNotFoundError:
+        pass
+
+    if not key:
+        die(
+            f"clé d'API Jellyfin introuvable.\n"
+            f"Attendu : JELLYFIN_API_KEY=… dans {ENV_FILE}\n"
+            f"(ou dans la variable d'environnement du même nom)"
+        )
+    base = os.environ.get("JELLYFIN_URL") or f"http://127.0.0.1:{port or '8096'}"
+    return key, base.rstrip("/")
+
+
+KEY, BASE = "", ""
+
+
+def headers(token: str | None = None) -> dict[str, str]:
+    return {
+        "Authorization": (
+            f'MediaBrowser Token="{token or KEY}", Client="{CLIENT}", Device="NAS", '
+            f'DeviceId="{CLIENT}", Version="0.1.0"'
+        ),
+        "Content-Type": "application/json",
+    }
+
+
+def call(method: str, path: str, body=None, token: str | None = None):
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(BASE + path, data=data, headers=headers(token), method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode()
+            return resp.status, (json.loads(raw) if raw.strip() else None)
+    except urllib.error.HTTPError as err:
+        raw = err.read().decode()
+        try:
+            return err.code, json.loads(raw)
+        except Exception:
+            return err.code, raw[:300]
+    except urllib.error.URLError as err:
+        die(f"serveur Jellyfin injoignable sur {BASE}\n  ({err.reason})")
+
+
+# --------------------------------------------------------------------------
+# Affichage
+# --------------------------------------------------------------------------
+
+def die(message: str, code: int = 1):
+    # Vider stdout d'abord : sinon l'erreur peut s'afficher avant le contexte
+    # quand la sortie n'est pas un terminal (sortie redirigée ou pipe).
+    sys.stdout.flush()
+    print(f"music : {message}", file=sys.stderr)
+    sys.exit(code)
+
+
+def ok(message: str):
+    print(f"  OK   {message}")
+
+
+def warn(message: str):
+    print(f"  !    {message}")
+
+
+def header(title: str):
+    print(f"\n{title}")
+
+
+def usage(code: int = 0):
+    print(__doc__.strip())
+    sys.exit(code)
+
+
+# --------------------------------------------------------------------------
+# Comptes
+# --------------------------------------------------------------------------
+
+def find_user(name: str):
+    """Retrouve un compte par son nom (insensible à la casse)."""
+    status, users = call("GET", "/Users")
+    if status != 200 or not isinstance(users, list):
+        die(f"impossible de lister les comptes (HTTP {status})")
+    lowered = name.casefold()
+    for u in users:
+        if (u.get("Name") or "").casefold() == lowered:
+            return u
+    return None
+
+
+def is_admin(user) -> bool:
+    return bool((user.get("Policy") or {}).get("IsAdministrator"))
+
+
+def admin_count() -> int:
+    _, users = call("GET", "/Users")
+    return sum(1 for u in (users or []) if is_admin(u))
+
+
+def ask_password(name: str) -> str:
+    """Mot de passe demandé masqué, avec confirmation (rien dans l'historique)."""
+    first = getpass.getpass(f"Mot de passe pour « {name} » : ")
+    if not first:
+        die("mot de passe vide")
+    if first != getpass.getpass("Répète le mot de passe : "):
+        die("les deux mots de passe ne correspondent pas")
+    return first
+
+
+def check_password_quality(password: str):
+    if len(password) < 8:
+        warn(f"mot de passe court ({len(password)} caractères) — ce serveur est joignable depuis Internet")
+    if password != password.strip():
+        warn("le mot de passe commence ou finit par un espace, facile à mal recopier")
+
+
+def verify_login(name: str, password: str) -> dict | None:
+    """Se connecte vraiment avec le nouveau compte : c'est la seule preuve qu'il marche."""
+    status, auth = call("POST", "/Users/AuthenticateByName", {"Username": name, "Pw": password})
+    if status != 200 or not auth:
+        return None
+    return auth
+
+
+def cmd_adduser(args: list[str]):
+    if not args:
+        die("usage : music adduser <nom> [motdepasse]")
+    name = args[0]
+    if name.strip() != name or not name:
+        die("nom invalide (espaces au début ou à la fin)")
+    password = args[1] if len(args) > 1 else ask_password(name)
+    check_password_quality(password)
+
+    if find_user(name):
+        die(f"un compte nommé « {name} » existe déjà")
+
+    header(f"Création du compte « {name} »")
+    status, created = call("POST", "/Users/New", {"Name": name})
+    if status == 400:
+        die(f"Jellyfin refuse ce nom (HTTP 400) — le compte existe peut-être déjà côté serveur")
+    if status != 200 or not created or not created.get("Id"):
+        die(f"création refusée par Jellyfin (HTTP {status})")
+    user_id = created["Id"]
+    ok("compte créé")
+
+    # CurrentPw vide : c'est le seul moyen de définir un mot de passe sur un compte
+    # neuf via l'API. Ne JAMAIS utiliser ResetPassword, qui l'efface au lieu de le poser.
+    status, body = call("POST", f"/Users/{user_id}/Password", {"CurrentPw": "", "NewPw": password})
+    if status not in (200, 204):
+        call("DELETE", f"/Users/{user_id}")
+        die(f"impossible de définir le mot de passe (HTTP {status}) — le compte incomplet a été supprimé")
+    ok("mot de passe défini")
+
+    # Vérification réelle : on se connecte avec ce compte et on regarde ce qu'il voit.
+    auth = verify_login(name, password)
+    if not auth:
+        warn("le compte a été créé mais la connexion de vérification a échoué")
+        print("       Vérifie avec : music passwd " + name)
+    else:
+        token = auth.get("AccessToken")
+        uid = (auth.get("User") or {}).get("Id") or user_id
+        status, albums = call(
+            "GET",
+            f"/Users/{uid}/Items?IncludeItemTypes=MusicAlbum&Recursive=true&Limit=1",
+            token=token,
+        )
+        total = (albums or {}).get("TotalRecordCount") if status == 200 else None
+        ok(f"connexion vérifiée — {total if total is not None else '?'} albums visibles")
+
+    header("Ce compte peut maintenant se connecter")
+    print(f"  Serveur    {os.environ.get('MUSIC_SERVER_LABEL', 'https://dh4300plus-59ae.tailb74e62.ts.net')}")
+    print(f"  Utilisateur {name}")
+    print(f"  Droits      écoute et bibliothèque (pas administrateur)")
+
+
+def cmd_users(_args: list[str]):
+    status, users = call("GET", "/Users")
+    if status != 200 or not isinstance(users, list) or not users:
+        die(f"aucun compte lisible (HTTP {status})")
+
+    header(f"{len(users)} compte(s)")
+    print(f"  {'NOM':<22} {'ADMIN':<7} {'MOT DE PASSE':<13} ID")
+    for u in sorted(users, key=lambda x: (x.get("Name") or "").casefold()):
+        policy = u.get("Policy") or {}
+        name = u.get("Name") or "?"
+        admin = "oui" if policy.get("IsAdministrator") else "-"
+        disabled = " (désactivé)" if policy.get("IsDisabled") else ""
+        # Jellyfin n'expose pas le mot de passe : on indique seulement s'il y en a un.
+        _, ud = call("GET", f"/Users/{u.get('Id')}")
+        has_pw = "oui" if (ud or {}).get("HasPassword") else "non"
+        print(f"  {name:<22} {admin:<7} {has_pw:<13} {(u.get('Id') or '')[:8]}{disabled}")
+
+
+def cmd_passwd(args: list[str]):
+    if not args:
+        die("usage : music passwd <nom> [motdepasse]")
+    name = args[0]
+    password = args[1] if len(args) > 1 else ask_password(name)
+    check_password_quality(password)
+
+    user = find_user(name)
+    if not user:
+        die(f"aucun compte nommé « {name} »")
+
+    header(f"Mot de passe de « {user.get('Name')} »")
+    status, body = call("POST", f"/Users/{user['Id']}/Password", {"CurrentPw": "", "NewPw": password})
+    if status not in (200, 204):
+        die(f"refusé par Jellyfin (HTTP {status}) {json.dumps(body)[:160] if isinstance(body, dict) else ''}")
+    ok("mot de passe changé")
+
+    if verify_login(user.get("Name") or name, password):
+        ok("connexion vérifiée avec le nouveau mot de passe")
+    else:
+        warn("le changement est accepté mais la connexion échoue — vérifie le compte")
+
+
+def cmd_deluser(args: list[str]):
+    assume_yes = any(a in ("-y", "--yes") for a in args)
+    names = [a for a in args if not a.startswith("-")]
+    if not names:
+        die("usage : music deluser <nom> [-y]")
+    name = names[0]
+
+    user = find_user(name)
+    if not user:
+        die(f"aucun compte nommé « {name} »")
+
+    # Verrou de sécurité : supprimer le dernier administrateur enferme dehors.
+    if is_admin(user) and admin_count() <= 1:
+        die(
+            f"« {user.get('Name')} » est le seul compte administrateur — suppression refusée.\n"
+            f"       Crée d'abord un autre administrateur depuis l'interface Jellyfin."
+        )
+
+    print(f"Compte à supprimer : {user.get('Name')} ({(user.get('Id') or '')[:8]})")
+    if not assume_yes:
+        # Sans terminal, on refuse plutôt que de supprimer en silence.
+        if not sys.stdin.isatty():
+            die("confirmation impossible sans terminal — relance avec -y")
+        if input("Confirmer ? [o/N] ").strip().casefold() not in ("o", "oui", "y", "yes"):
+            print("annulé")
+            return
+
+    status, _ = call("DELETE", f"/Users/{user['Id']}")
+    if status not in (200, 204):
+        die(f"suppression refusée par Jellyfin (HTTP {status})")
+    ok(f"compte « {user.get('Name')} » supprimé")
+
+
+# --------------------------------------------------------------------------
+
+COMMANDS = {
+    "adduser": cmd_adduser,
+    "users": cmd_users,
+    "passwd": cmd_passwd,
+    "deluser": cmd_deluser,
+}
+
+
+def main():
+    global KEY, BASE
+    argv = sys.argv[1:]
+
+    if not argv or argv[0] in ("help", "-h", "--help"):
+        usage(0)
+
+    command = argv[0]
+    if command not in COMMANDS:
+        print(f"music : commande inconnue « {command} »\n", file=sys.stderr)
+        usage(2)
+
+    KEY, BASE = read_env()
+    COMMANDS[command](argv[1:])
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(130)
