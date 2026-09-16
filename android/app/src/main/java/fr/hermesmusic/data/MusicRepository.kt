@@ -1,8 +1,11 @@
 package fr.hermesmusic.data
 
+import fr.hermesmusic.network.CreatePlaylistRequest
 import fr.hermesmusic.network.JfItem
 import fr.hermesmusic.network.JellyfinApi
+import fr.hermesmusic.network.PlaylistUserRef
 import fr.hermesmusic.network.QueryResult
+import fr.hermesmusic.network.UpdatePlaylistRequest
 
 /**
  * Accès aux données musicales. Jellyfin reste la source de vérité : on ne
@@ -13,9 +16,9 @@ class MusicRepository(
     private val session: () -> Session,
 ) {
     companion object {
-        private const val FIELDS =
+        const val FIELDS =
             "ImageTags,AlbumPrimaryImageTag,AlbumArtist,Artists,Album,AlbumId," +
-                "ProductionYear,ChildCount,RunTimeTicks,IndexNumber,UserData"
+                "ProductionYear,ChildCount,RunTimeTicks,IndexNumber,UserData,PlaylistItemId"
     }
 
     private fun uid() = session().userId
@@ -82,6 +85,30 @@ class MusicRepository(
                 "Limit" to "$limit",
                 "StartIndex" to "$startIndex",
             )
+        )
+    )
+
+    /** Morceaux déjà écoutés, du plus récent au plus ancien (historique Jellyfin). */
+    suspend fun recentlyPlayed(limit: Int = 20) = api.userItems(
+        uid(),
+        mapOf(
+            "Filters" to "IsPlayed",
+            "IncludeItemTypes" to "Audio",
+            "Recursive" to "true",
+            "SortBy" to "DatePlayed",
+            "SortOrder" to "Descending",
+            "Limit" to "$limit",
+            "Fields" to FIELDS,
+        )
+    )
+
+    /** Écouté en partie mais pas terminé : sert au bouton « Reprendre la lecture ». */
+    suspend fun resumeAudio(limit: Int = 12) = api.resume(
+        uid(),
+        mapOf(
+            "MediaType" to "Audio",
+            "Limit" to "$limit",
+            "Fields" to FIELDS,
         )
     )
 
@@ -155,11 +182,56 @@ class MusicRepository(
         )
     )
 
-    suspend fun item(itemId: String): JfItem = api.items(base(mapOf("Ids" to itemId))).Items.first()
+    suspend fun playlistItems(playlistId: String): QueryResult = api.playlistItems(
+        playlistId,
+        mapOf("UserId" to uid(), "Fields" to FIELDS),
+    )
+
+    suspend fun item(itemId: String): JfItem =
+        itemOrNull(itemId) ?: error("Élément introuvable : $itemId")
+
+    suspend fun itemOrNull(itemId: String): JfItem? =
+        runCatching { api.items(base(mapOf("Ids" to itemId))).Items.firstOrNull() }.getOrNull()
 
     suspend fun setFavorite(itemId: String, favorite: Boolean) {
         if (favorite) api.addFavorite(uid(), itemId) else api.removeFavorite(uid(), itemId)
     }
+
+    /* --- Playlists --- */
+
+    /** Crée une playlist. Jellyfin exige un nom non vide. */
+    suspend fun createPlaylist(name: String, itemIds: List<String> = emptyList()): String {
+        val clean = name.trim()
+        require(clean.isNotEmpty()) { "Le nom de la playlist est vide" }
+        val created = api.createPlaylist(
+            CreatePlaylistRequest(Name = clean, Ids = itemIds, UserId = uid())
+        )
+        return created.Id?.takeIf { it.isNotBlank() }
+            ?: error("Jellyfin n'a pas renvoyé l'identifiant de la playlist")
+    }
+
+    suspend fun renamePlaylist(playlistId: String, name: String) {
+        val clean = name.trim()
+        require(clean.isNotEmpty()) { "Le nom de la playlist est vide" }
+        api.updatePlaylist(
+            playlistId,
+            UpdatePlaylistRequest(Name = clean, Users = listOf(PlaylistUserRef(uid()))),
+        )
+    }
+
+    suspend fun deletePlaylist(playlistId: String) = api.deleteItem(playlistId)
+
+    suspend fun addToPlaylist(playlistId: String, itemIds: List<String>) {
+        if (itemIds.isEmpty()) return
+        api.addToPlaylist(playlistId, itemIds.joinToString(","), uid())
+    }
+
+    /** [entryId] est le `PlaylistItemId` renvoyé par [playlistItems], pas l'identifiant du morceau. */
+    suspend fun removeFromPlaylist(playlistId: String, entryId: String) =
+        api.removeFromPlaylist(playlistId, entryId)
+
+    suspend fun movePlaylistItem(playlistId: String, entryId: String, newIndex: Int) =
+        api.movePlaylistItem(playlistId, entryId, newIndex)
 
     /** URL de pochette, plafonnée (jamais de pleine résolution, cf. perf §28). */
     fun imageUrl(item: JfItem, maxHeight: Int = 300): String? =

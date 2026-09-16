@@ -19,12 +19,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -61,12 +62,6 @@ import fr.hermesmusic.core.kicker
 import fr.hermesmusic.player.QueueEntry
 import kotlinx.coroutines.launch
 
-/** Libellé de durée à partir de millisecondes. */
-fun fmtMs(ms: Long): String {
-    val total = (ms / 1000).coerceAtLeast(0)
-    return "%d:%02d".format(total / 60, total % 60)
-}
-
 /** Lecteur plein écran. Le lecteur réel vit dans le service : ici on ne fait qu'afficher et piloter. */
 @Composable
 fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
@@ -77,6 +72,7 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
     var repeatMode by remember { mutableStateOf(Player.REPEAT_MODE_OFF) }
     var favorite by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    var addingToPlaylist by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // État favori du morceau en cours : demandé au serveur (source de vérité).
@@ -86,7 +82,7 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
             return@LaunchedEffect
         }
         favorite = runCatching {
-            graph.repo.item(s.itemId).UserData?.IsFavorite == true
+            graph.repo.item(s.itemId).isFavorite
         }.getOrDefault(false)
     }
 
@@ -98,7 +94,7 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    0f to Color(0xFF1B1D2E),
+                    0f to if (Nocturne.dark) Color(0xFF1B1D2E) else Nocturne.Surface2,
                     0.62f to Nocturne.Bg,
                 )
             ),
@@ -107,36 +103,28 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clickable { onClose() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Réduire",
-                        tint = Nocturne.Dim,
-                    )
-                }
+                ActionIcon(
+                    icon = Icons.Filled.KeyboardArrowDown,
+                    description = "Réduire le lecteur",
+                    tint = Nocturne.Dim,
+                ) { onClose() }
                 Spacer(Modifier.weight(1f))
                 Text("LECTURE", style = kicker(), color = Nocturne.Dim2)
                 Spacer(Modifier.weight(1f))
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clickable { showQueue = true },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.PlaylistPlay,
-                        contentDescription = "File d'attente",
-                        tint = Nocturne.Dim,
-                    )
-                }
+                ActionIcon(
+                    icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                    description = "Ajouter la file à une playlist",
+                    tint = Nocturne.Dim,
+                    enabled = s.queue.isNotEmpty(),
+                ) { addingToPlaylist = true }
+                ActionIcon(
+                    icon = Icons.AutoMirrored.Filled.PlaylistPlay,
+                    description = "File d'attente",
+                    tint = Nocturne.Dim,
+                ) { showQueue = true }
             }
 
             Column(
@@ -194,7 +182,7 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
                     colors = SliderDefaults.colors(
                         thumbColor = Nocturne.Ink,
                         activeTrackColor = Nocturne.Accent,
-                        inactiveTrackColor = Color(0x24E9E9ED),
+                        inactiveTrackColor = Nocturne.Hairline,
                     ),
                 )
                 Row(
@@ -203,7 +191,8 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
                 ) {
                     Text(
                         fmtMs(if (dragging) (dragValue * duration).toLong() else s.positionMs),
-                        color = Nocturne.Dim2, fontSize = 11.sp,
+                        color = Nocturne.Dim2,
+                        fontSize = 11.sp,
                     )
                     Text(fmtMs(s.durationMs), color = Nocturne.Dim2, fontSize = 11.sp)
                 }
@@ -233,7 +222,11 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
                     PlayPauseButton(s.isPlaying) { graph.player.togglePlayPause() }
                     PlayerButton(Icons.Filled.SkipNext, "Suivant") { graph.player.next() }
                     PlayerButton(
-                        icon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                        icon = if (repeatMode == Player.REPEAT_MODE_ONE) {
+                            Icons.Filled.RepeatOne
+                        } else {
+                            Icons.Filled.Repeat
+                        },
                         description = "Répéter",
                         active = repeatMode != Player.REPEAT_MODE_OFF,
                         small = true,
@@ -252,28 +245,40 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 20.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    contentDescription = if (favorite) "Retirer des favoris" else "Ajouter aux favoris",
+                ActionIcon(
+                    icon = if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    description = if (favorite) {
+                        "Retirer des favoris"
+                    } else {
+                        "Ajouter aux favoris"
+                    },
                     tint = if (favorite) Nocturne.Accent else Nocturne.Dim,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable {
-                            val target = !favorite
-                            favorite = target
-                            val id = s.itemId
-                            if (id.isNotBlank()) {
-                                scope.launch { runCatching { graph.repo.setFavorite(id, target) } }
-                            }
-                        },
-                )
-                Spacer(Modifier.width(14.dp))
+                    boxSize = 44.dp,
+                    iconSize = 20.dp,
+                ) {
+                    val target = !favorite
+                    favorite = target
+                    val id = s.itemId
+                    if (id.isNotBlank()) {
+                        scope.launch { runCatching { graph.repo.setFavorite(id, target) } }
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
                 Text(
-                    if (s.queueSize > 1) "${s.queueSize} morceaux dans la file" else "1 morceau dans la file",
+                    buildString {
+                        if (s.fromDevice) append("hors-ligne · ")
+                        append(
+                            if (s.queueSize > 1) {
+                                "${s.queueSize} morceaux dans la file"
+                            } else {
+                                "1 morceau dans la file"
+                            }
+                        )
+                    },
                     style = kicker(),
                     color = Nocturne.Dim2,
                 )
@@ -282,6 +287,15 @@ fun PlayerScreen(graph: AppGraph, onClose: () -> Unit) {
 
         if (showQueue) {
             QueueOverlay(graph, s.queue, s.itemId) { showQueue = false }
+        }
+
+        if (addingToPlaylist) {
+            AddToPlaylistOverlay(
+                graph = graph,
+                itemIds = s.queue.map { it.id },
+                itemLabel = "File de lecture · ${s.queue.size} morceaux",
+                onClose = { addingToPlaylist = false },
+            )
         }
     }
 }
@@ -309,8 +323,11 @@ private fun QueueOverlay(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable { graph.player.playAt(e.index); onClose() }
-                                .padding(horizontal = 20.dp, vertical = 9.dp),
+                                .clickable {
+                                    graph.player.playAt(e.index)
+                                    onClose()
+                                }
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -327,7 +344,12 @@ private fun QueueOverlay(
                                     fontSize = 14.sp,
                                     maxLines = 1,
                                 )
-                                Text(e.artist, color = Nocturne.Dim, fontSize = 11.5.sp, maxLines = 1)
+                                Text(
+                                    e.artist,
+                                    color = Nocturne.Dim,
+                                    fontSize = 11.5.sp,
+                                    maxLines = 1,
+                                )
                             }
                             if (current) {
                                 Icon(
@@ -358,7 +380,7 @@ private fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit) {
         Icon(
             if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             contentDescription = if (isPlaying) "Pause" else "Lecture",
-            tint = Color(0xFF0E0F18),
+            tint = Nocturne.OnAccent,
             modifier = Modifier.size(30.dp),
         )
     }
@@ -374,7 +396,7 @@ private fun PlayerButton(
 ) {
     Box(
         Modifier
-            .size(if (small) 46.dp else 54.dp)
+            .size(if (small) 48.dp else 54.dp)
             .clip(CircleShape)
             .clickable { onClick() },
         contentAlignment = Alignment.Center,

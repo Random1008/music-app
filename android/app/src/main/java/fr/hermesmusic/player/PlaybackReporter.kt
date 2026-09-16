@@ -18,10 +18,12 @@ import kotlinx.coroutines.launch
 class PlaybackReporter(
     private val api: () -> JellyfinApi,
     private val state: StateFlow<PlayerUiState>,
+    /** Injectable pour pouvoir tester la cadence sans attendre dix secondes. */
+    private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     companion object {
         /** Fréquence des points de reprise : valeur usuelle des clients Jellyfin. */
-        private const val PROGRESS_EVERY_MS = 10_000L
+        const val PROGRESS_EVERY_MS = 10_000L
     }
 
     fun start(scope: CoroutineScope) {
@@ -33,25 +35,25 @@ class PlaybackReporter(
             state.collect { s ->
                 val id = s.itemId
                 if (id.isBlank()) return@collect
-                val now = System.currentTimeMillis()
+                val time = now()
 
                 // Morceau différent de celui déclaré : on annonce le démarrage.
                 if (id != currentId) {
                     currentId = id
                     wasPlaying = s.isPlaying
-                    lastReportAt = now
+                    lastReportAt = time
                     send { it.reportPlaybackStart(info(s)) }
                     return@collect
                 }
 
                 val playingChanged = s.isPlaying != wasPlaying
-                val due = s.isPlaying && (now - lastReportAt) >= PROGRESS_EVERY_MS
+                val due = s.isPlaying && (time - lastReportAt) >= PROGRESS_EVERY_MS
                 wasPlaying = s.isPlaying
 
                 // On saute les rapports pendant la mise en mémoire tampon : un
                 // état transitoire ne doit pas être déclaré comme une pause.
                 if (!s.isBuffering && (playingChanged || due)) {
-                    lastReportAt = now
+                    lastReportAt = time
                     send { it.reportPlaybackProgress(info(s)) }
                 }
             }

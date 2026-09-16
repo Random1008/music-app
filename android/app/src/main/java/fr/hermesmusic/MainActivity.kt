@@ -21,7 +21,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.hermesmusic.core.HermesTheme
 import fr.hermesmusic.core.Nocturne
+import fr.hermesmusic.core.ServerState
 import fr.hermesmusic.ui.LoginScreen
+import fr.hermesmusic.ui.ServerUnreachableScreen
 import fr.hermesmusic.ui.Shell
 
 class MainActivity : ComponentActivity() {
@@ -30,13 +32,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val graph = (application as HermesApp).graph
         // On se connecte au service de lecture dès le démarrage : comme ça, si
-        // une musique joue déjà, l'interface la retrouve telle quelle.
+        // une musique joue déjà — ou si l'app a été tuée en pleine écoute — on
+        // retrouve la file et la position (voir AppGraph.persistSession).
         graph.start()
 
         setContent {
             HermesTheme {
                 val ready by graph.ready.collectAsStateWithLifecycle()
                 val session by graph.session.collectAsStateWithLifecycle()
+                val serverState by graph.serverState.collectAsStateWithLifecycle()
 
                 // Notification de lecture : requise à partir d'Android 13.
                 val context = LocalContext.current
@@ -60,6 +64,11 @@ class MainActivity : ComponentActivity() {
                         }
 
                         !session.isConnected -> LoginScreen(graph)
+
+                        // Serveur injoignable : écran explicite avec « Réessayer »
+                        // plutôt qu'une bibliothèque vide et muette (spec §27).
+                        serverState == ServerState.Unreachable -> ServerUnreachableScreen(graph)
+
                         else -> Shell(graph)
                     }
                 }

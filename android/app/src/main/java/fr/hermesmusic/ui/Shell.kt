@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,15 +13,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
@@ -51,7 +48,10 @@ import fr.hermesmusic.core.Detail
 import fr.hermesmusic.core.Nocturne
 import fr.hermesmusic.core.kicker
 
-private data class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class Tab(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
 
 @Composable
 fun Shell(graph: AppGraph) {
@@ -64,7 +64,7 @@ fun Shell(graph: AppGraph) {
         Tab("Accueil", Icons.Filled.Home),
         Tab("Recherche", Icons.Filled.Search),
         Tab("Bibliothèque", Icons.Filled.LibraryMusic),
-        Tab("Playlists", Icons.Filled.PlaylistPlay),
+        Tab("Playlists", Icons.AutoMirrored.Filled.PlaylistPlay),
     )
 
     Box(Modifier.fillMaxSize()) {
@@ -111,10 +111,13 @@ fun Shell(graph: AppGraph) {
             }
         }
 
-        // Page album / artiste, empilée par-dessus les onglets.
+        // Écran empilé (album, artiste, playlist, paramètres, hors-ligne).
         when (val d = detail) {
             is Detail.Album -> AlbumDetail(graph, d.id) { graph.closeDetail() }
             is Detail.Artist -> ArtistDetail(graph, d.id) { graph.closeDetail() }
+            is Detail.Playlist -> PlaylistDetail(graph, d.id, d.title) { graph.closeDetail() }
+            is Detail.Settings -> SettingsScreen(graph) { graph.closeDetail() }
+            is Detail.Downloads -> DownloadsScreen(graph) { graph.closeDetail() }
             null -> Unit
         }
 
@@ -145,7 +148,7 @@ private fun MiniPlayer(graph: AppGraph, onOpen: () -> Unit) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 9.dp),
+                .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -165,37 +168,28 @@ private fun MiniPlayer(graph: AppGraph, onOpen: () -> Unit) {
             }
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f)) {
-                Text(s.title, color = Nocturne.Ink, fontSize = 13.sp, maxLines = 1)
+                Text(
+                    if (s.fromDevice) "↓ ${s.title}" else s.title,
+                    color = Nocturne.Ink,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                )
                 Text(s.artist, color = Nocturne.Dim, fontSize = 11.5.sp, maxLines = 1)
             }
-            Box(
-                Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(50))
-                    .clickable { graph.player.togglePlayPause() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (s.isPlaying) "Pause" else "Lecture",
-                    tint = Nocturne.Ink,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Box(
-                Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(50))
-                    .clickable { graph.player.next() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.SkipNext,
-                    contentDescription = "Suivant",
-                    tint = Nocturne.Ink,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+            ActionIcon(
+                icon = if (s.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                description = if (s.isPlaying) "Pause" else "Lecture",
+                tint = Nocturne.Ink,
+                boxSize = 44.dp,
+                iconSize = 22.dp,
+            ) { graph.player.togglePlayPause() }
+            ActionIcon(
+                icon = Icons.Filled.SkipNext,
+                description = "Suivant",
+                tint = Nocturne.Ink,
+                boxSize = 44.dp,
+                iconSize = 22.dp,
+            ) { graph.player.next() }
         }
         // Ligne de progression (2 px, comme dans la maquette)
         Box(
@@ -226,21 +220,19 @@ fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)?
         verticalAlignment = Alignment.Bottom,
     ) {
         Text(title, color = Nocturne.Ink, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-        if (action != null) {
+        if (action != null && onAction != null) {
             Text(
                 action,
                 style = kicker(),
                 color = Nocturne.Dim2,
-                modifier = Modifier.then(
-                    if (onAction != null) Modifier.clickable(onClick = onAction) else Modifier
-                ),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
             )
         }
     }
 }
-
-fun fmtDuration(seconds: Int): String =
-    "%d:%02d".format(seconds / 60, seconds % 60)
 
 @Composable
 fun EmptyState(title: String, detail: String) {
@@ -259,6 +251,9 @@ fun EmptyState(title: String, detail: String) {
 @Composable
 fun LoadingState() {
     Box(Modifier.fillMaxWidth().height(120.dp), Alignment.Center) {
-        androidx.compose.material3.CircularProgressIndicator(color = Nocturne.Accent, strokeWidth = 2.dp)
+        androidx.compose.material3.CircularProgressIndicator(
+            color = Nocturne.Accent,
+            strokeWidth = 2.dp,
+        )
     }
 }

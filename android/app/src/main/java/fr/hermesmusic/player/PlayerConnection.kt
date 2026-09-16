@@ -40,11 +40,16 @@ data class PlayerUiState(
     val durationMs: Long = 0,
     val queueSize: Int = 0,
     val queue: List<QueueEntry> = emptyList(),
+    /** Vrai quand le morceau en cours est lu depuis un fichier de l'appareil. */
+    val fromDevice: Boolean = false,
 )
 
 /**
  * Pont entre l'interface et le lecteur qui vit dans [PlaybackService].
  * L'UI ne fait que refléter l'état : elle ne possède jamais le lecteur.
+ *
+ * Toutes les méthodes doivent être appelées depuis le fil principal : Media3
+ * refuse l'accès au contrôleur depuis un autre fil.
  */
 class PlayerConnection(
     private val context: Context,
@@ -58,12 +63,16 @@ class PlayerConnection(
         val artist: String,
         val artworkUrl: String?,
         val streamUrl: String,
+        val fromDevice: Boolean = false,
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private var controller: MediaController? = null
     private var ticker: Job? = null
+
+    /** Instantané de la file, tenu à jour sur le fil principal (voir [snapshot]). */
+    private var currentSnapshot: SavedSession? = null
 
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
@@ -75,8 +84,12 @@ class PlayerConnection(
         override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) = refresh()
     }
 
-    fun connect() {
-        if (controller != null) return
+    /** [onReady] est appelé une fois le lecteur disponible : sert à restaurer la session. */
+    fun connect(onReady: (() -> Unit)? = null) {
+        if (controller != null) {
+            onReady?.invoke()
+            return
+        }
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         future.addListener(
@@ -84,6 +97,7 @@ class PlayerConnection(
                 controller = runCatching { future.get() }.getOrNull()?.also { it.addListener(listener) }
                 refresh()
                 startTicker()
+                onReady?.invoke()
             },
             ContextCompat.getMainExecutor(context),
         )
@@ -104,6 +118,17 @@ class PlayerConnection(
         c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), 0L)
         c.prepare()
         c.play()
+        refresh()
+    }
+
+    /** Remet la file d'une session précédente, à l'arrêt (l'utilisateur appuie sur lecture). */
+    fun restore(tracks: List<TrackPayload>, startIndex: Int, positionMs: Long) {
+        val c = controller ?: return
+        if (tracks.isEmpty()) return
+        val items = tracks.map(toMediaItem)
+        c.setMediaItems(items, startIndex.coerceIn(0, items.lastIndex), positionMs.coerceAtLeast(0))
+        c.prepare()
+        c.pause()
         refresh()
     }
 
@@ -131,6 +156,13 @@ class PlayerConnection(
         refresh()
     }
 
+    /** Vide la file (déconnexion). */
+    fun clear() {
+        controller?.clearMediaItems()
+        currentSnapshot = null
+        _state.value = PlayerUiState()
+    }
+
     fun setShuffle(on: Boolean) {
         controller?.shuffleModeEnabled = on
     }
@@ -138,6 +170,14 @@ class PlayerConnection(
     fun setRepeatMode(mode: Int) {
         controller?.repeatMode = mode
     }
+
+    /**
+     * File et position courantes, pour la reprise de session.
+     *
+     * La valeur est mise en cache dans [refresh] (fil principal) et non relue
+     * depuis le contrôleur : Media3 interdit d'y accéder depuis un autre fil.
+     */
+    fun snapshot(): SavedSession? = currentSnapshot
 
     private fun startTicker() {
         ticker?.cancel()
@@ -159,6 +199,7 @@ class PlayerConnection(
         val c = controller ?: return
         val md = c.mediaMetadata
         val count = c.mediaItemCount
+        val uri = c.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
         _state.value = PlayerUiState(
             hasItem = count > 0,
             itemId = c.currentMediaItem?.mediaId.orEmpty(),
@@ -171,7 +212,9 @@ class PlayerConnection(
             durationMs = c.duration.takeIf { it > 0 } ?: 0L,
             queueSize = count,
             queue = readQueue(c, count),
+            fromDevice = uri.startsWith("file:"),
         )
+        currentSnapshot = readSnapshot(c, count)
     }
 
     private fun readQueue(c: MediaController, count: Int): List<QueueEntry> =
@@ -186,4 +229,24 @@ class PlayerConnection(
                 )
             }
         }.getOrDefault(emptyList())
+
+    private fun readSnapshot(c: MediaController, count: Int): SavedSession? {
+        if (count == 0) return null
+        return runCatching {
+            SavedSession(
+                tracks = (0 until count).map { i ->
+                    val item = c.getMediaItemAt(i)
+                    SavedTrack(
+                        id = item.mediaId,
+                        title = item.mediaMetadata.title?.toString().orEmpty(),
+                        artist = item.mediaMetadata.artist?.toString().orEmpty(),
+                        artworkUrl = item.mediaMetadata.artworkUri?.toString(),
+                        streamUrl = item.localConfiguration?.uri?.toString().orEmpty(),
+                    )
+                },
+                index = c.currentMediaItemIndex.coerceAtLeast(0),
+                positionMs = c.currentPosition.coerceAtLeast(0),
+            )
+        }.getOrNull()
+    }
 }
