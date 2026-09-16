@@ -29,6 +29,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Le lecteur vit dans ce service : lecture en arrière-plan, commandes
+             de notification et d'écran verrouillé, casque Bluetooth. -->
+        <service
+            android:name=".player.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>

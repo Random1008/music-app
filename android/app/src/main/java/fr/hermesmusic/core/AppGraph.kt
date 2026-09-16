@@ -1,11 +1,16 @@
 package fr.hermesmusic.core
 
 import android.content.Context
+import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import fr.hermesmusic.data.MusicRepository
 import fr.hermesmusic.data.Session
 import fr.hermesmusic.data.SettingsStore
 import fr.hermesmusic.network.AuthRequest
 import fr.hermesmusic.network.JellyfinApi
+import fr.hermesmusic.network.JfItem
+import fr.hermesmusic.player.PlayerConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -93,6 +98,45 @@ class AppGraph(private val context: Context) {
 
     val repo: MusicRepository by lazy {
         MusicRepository(api(), session = { _session.value })
+    }
+
+    /**
+     * Lecteur : le player vit dans [fr.hermesmusic.player.PlaybackService].
+     * Ici on ne garde qu'une télécommande (MediaController) — l'interface ne
+     * possède jamais le lecteur, donc la musique survit aux changements d'écran,
+     * à la mise en arrière-plan et au verrouillage du téléphone.
+     */
+    val player: PlayerConnection by lazy {
+        PlayerConnection(context) { p ->
+            MediaItem.Builder()
+                .setMediaId(p.id)
+                .setUri(p.streamUrl)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(p.title)
+                        .setArtist(p.artist)
+                        .setArtworkUri(p.artworkUrl?.toUri())
+                        .setIsBrowsable(false)
+                        .setIsPlayable(true)
+                        .build()
+                )
+                .build()
+        }
+    }
+
+    /** Convertit un élément Jellyfin en charge utile lisible par le lecteur. */
+    fun payload(item: JfItem) = PlayerConnection.TrackPayload(
+        id = item.Id,
+        title = item.Name.orEmpty(),
+        artist = item.artistLine,
+        artworkUrl = repo.imageUrl(item, maxHeight = 600),
+        streamUrl = repo.streamUrl(item),
+    )
+
+    /** Lance la lecture d'une liste à partir de l'index donné. */
+    fun play(items: List<JfItem>, index: Int = 0) {
+        if (items.isEmpty()) return
+        player.play(items.map { payload(it) }, index)
     }
 
     /** Recharge la session depuis le disque (jeton, URL, identifiant d'appareil). */

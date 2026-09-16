@@ -1,6 +1,5 @@
 package fr.hermesmusic.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -26,10 +25,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -40,6 +41,7 @@ import fr.hermesmusic.core.AppGraph
 import fr.hermesmusic.core.Nocturne
 import fr.hermesmusic.core.kicker
 import fr.hermesmusic.network.JfItem
+import kotlinx.coroutines.launch
 
 /** Pochette distante, taille plafonnée (jamais de pleine résolution). */
 @Composable
@@ -63,13 +65,13 @@ fun Cover(graph: AppGraph, item: JfItem, size: Dp, round: Boolean = false) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeTab(graph: AppGraph) {
     var albums by remember { mutableStateOf<List<JfItem>?>(null) }
     var tracks by remember { mutableStateOf<List<JfItem>?>(null) }
     var counts by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         runCatching {
@@ -101,10 +103,7 @@ fun HomeTab(graph: AppGraph) {
             }
         }
 
-        error?.let {
-            item { EmptyState("Bibliothèque indisponible", it) }
-        }
-
+        error?.let { item { EmptyState("Bibliothèque indisponible", it) } }
         if (albums == null && error == null) item { LoadingState() }
 
         albums?.takeIf { it.isNotEmpty() }?.let { list ->
@@ -114,16 +113,15 @@ fun HomeTab(graph: AppGraph) {
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(list) { album ->
-                        Column(Modifier.width(132.dp)) {
+                    itemsIndexed(list) { _, album ->
+                        Column(
+                            Modifier
+                                .width(132.dp)
+                                .clickable { playAlbum(graph, scope, album) },
+                        ) {
                             Cover(graph, album, 132.dp)
                             Spacer(Modifier.height(9.dp))
-                            Text(
-                                album.Name ?: "",
-                                color = Nocturne.Ink,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                            )
+                            Text(album.Name ?: "", color = Nocturne.Ink, fontSize = 13.sp, maxLines = 1)
                             Text(
                                 album.AlbumArtist ?: album.artistLine,
                                 color = Nocturne.Dim,
@@ -138,17 +136,32 @@ fun HomeTab(graph: AppGraph) {
 
         tracks?.takeIf { it.isNotEmpty() }?.let { list ->
             item { SectionHeader("Récemment ajouté") }
-            items(list) { track -> TrackRow(graph, track) }
+            itemsIndexed(list) { index, track ->
+                TrackRow(graph, track) { graph.play(list, index) }
+            }
         }
     }
 }
 
+/** Ouvre un album : récupère ses pistes puis lance la lecture depuis la première. */
+fun playAlbum(graph: AppGraph, scope: kotlinx.coroutines.CoroutineScope, album: JfItem) {
+    scope.launch {
+        val tracks = runCatching { graph.repo.albumTracks(album.Id).Items }.getOrDefault(emptyList())
+        if (tracks.isNotEmpty()) graph.play(tracks, 0)
+    }
+}
+
 @Composable
-fun TrackRow(graph: AppGraph, track: JfItem, subtitle: String? = null) {
+fun TrackRow(
+    graph: AppGraph,
+    track: JfItem,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { /* lecture : étape suivante */ }
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 20.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -181,7 +194,7 @@ fun SearchTab(graph: AppGraph) {
             return@LaunchedEffect
         }
         busy = true
-        kotlinx.coroutines.delay(280) // recherche instantanée mais non frénétique
+        kotlinx.coroutines.delay(280)
         runCatching { graph.repo.search(query.trim()).Items }
             .onSuccess { results = it }
             .onFailure { results = emptyList() }
@@ -203,7 +216,7 @@ fun SearchTab(graph: AppGraph) {
                 focusedContainerColor = Nocturne.Surface2,
                 unfocusedContainerColor = Nocturne.Surface2,
                 focusedBorderColor = Nocturne.Accent,
-                unfocusedBorderColor = androidx.compose.ui.graphics.Color(0x24E9E9ED),
+                unfocusedBorderColor = Color(0x24E9E9ED),
                 focusedTextColor = Nocturne.Ink,
                 unfocusedTextColor = Nocturne.Ink,
                 cursorColor = Nocturne.Accent,
@@ -218,21 +231,28 @@ fun SearchTab(graph: AppGraph) {
             )
 
             results.isEmpty() && searched -> EmptyState("Aucun résultat", "Rien ne correspond à « $query ».")
-            else -> LazyColumn(Modifier.fillMaxSize()) {
+            else -> {
                 val songs = results.filter { it.Type == "Audio" }
                 val albums = results.filter { it.Type == "MusicAlbum" }
                 val artists = results.filter { it.Type == "MusicArtist" }
-                if (songs.isNotEmpty()) {
-                    item { SectionHeader("${songs.size} morceaux") }
-                    items(songs) { TrackRow(graph, it) }
-                }
-                if (albums.isNotEmpty()) {
-                    item { SectionHeader("${albums.size} albums") }
-                    items(albums) { TrackRow(graph, it, subtitle = it.AlbumArtist ?: it.artistLine) }
-                }
-                if (artists.isNotEmpty()) {
-                    item { SectionHeader("${artists.size} artistes") }
-                    items(artists) { TrackRow(graph, it, subtitle = "Artiste") }
+                val scope = rememberCoroutineScope()
+                LazyColumn(Modifier.fillMaxSize()) {
+                    if (songs.isNotEmpty()) {
+                        item { SectionHeader("${songs.size} morceaux") }
+                        itemsIndexed(songs) { index, t -> TrackRow(graph, t) { graph.play(songs, index) } }
+                    }
+                    if (albums.isNotEmpty()) {
+                        item { SectionHeader("${albums.size} albums") }
+                        itemsIndexed(albums) { _, a ->
+                            TrackRow(graph, a, subtitle = a.AlbumArtist ?: a.artistLine) {
+                                playAlbum(graph, scope, a)
+                            }
+                        }
+                    }
+                    if (artists.isNotEmpty()) {
+                        item { SectionHeader("${artists.size} artistes") }
+                        itemsIndexed(artists) { _, a -> TrackRow(graph, a, subtitle = "Artiste") }
+                    }
                 }
             }
         }
@@ -243,6 +263,7 @@ fun SearchTab(graph: AppGraph) {
 fun LibraryTab(graph: AppGraph) {
     var mode by remember { mutableStateOf(0) }
     var items by remember { mutableStateOf<List<JfItem>?>(null) }
+    val scope = rememberCoroutineScope()
     val labels = listOf("Albums", "Artistes", "Morceaux")
 
     LaunchedEffect(mode) {
@@ -266,7 +287,7 @@ fun LibraryTab(graph: AppGraph) {
             labels.forEachIndexed { index, label ->
                 Text(
                     label,
-                    color = if (mode == index) androidx.compose.ui.graphics.Color(0xFF0E0F18) else Nocturne.Dim,
+                    color = if (mode == index) Color(0xFF0E0F18) else Nocturne.Dim,
                     fontSize = 12.sp,
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
@@ -280,27 +301,32 @@ fun LibraryTab(graph: AppGraph) {
         when {
             items == null -> LoadingState()
             items!!.isEmpty() -> EmptyState("Rien à afficher", "Cette section est vide.")
-            else -> LazyColumn(Modifier.fillMaxSize()) {
-                if (mode == 1) {
-                    items(items!!, key = { it.Id }) { artist ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Cover(graph, artist, 46.dp, round = true)
-                            Spacer(Modifier.width(12.dp))
-                            Text(artist.Name ?: "", color = Nocturne.Ink, fontSize = 14.sp)
+            else -> {
+                val list = items!!
+                LazyColumn(Modifier.fillMaxSize()) {
+                    if (mode == 1) {
+                        itemsIndexed(list, key = { _, it -> it.Id }) { _, artist ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Cover(graph, artist, 46.dp, round = true)
+                                Spacer(Modifier.width(12.dp))
+                                Text(artist.Name ?: "", color = Nocturne.Ink, fontSize = 14.sp)
+                            }
                         }
-                    }
-                } else {
-                    items(items!!, key = { it.Id }) { item ->
-                        TrackRow(
-                            graph,
-                            item,
-                            subtitle = if (mode == 0) (item.AlbumArtist ?: item.artistLine) else null,
-                        )
+                    } else {
+                        itemsIndexed(list, key = { _, it -> it.Id }) { index, item ->
+                            TrackRow(
+                                graph,
+                                item,
+                                subtitle = if (mode == 0) (item.AlbumArtist ?: item.artistLine) else null,
+                            ) {
+                                if (mode == 0) playAlbum(graph, scope, item) else graph.play(list, index)
+                            }
+                        }
                     }
                 }
             }
@@ -318,20 +344,19 @@ fun PlaylistsTab(graph: AppGraph) {
         }.getOrDefault(emptyList())
     }
 
-    if (playlists.isNullOrEmpty()) {
-        EmptyState(
+    when {
+        playlists == null -> LoadingState()
+        playlists!!.isEmpty() -> EmptyState(
             "Aucune playlist",
             "Aucune playlist n'existe encore dans Jellyfin. Crée-en une depuis Jellyfin, elle apparaîtra ici.",
         )
-    } else {
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(playlists!!, key = { it.Id }) { pl ->
-                TrackRow(graph, pl, subtitle = "${pl.ChildCount ?: 0} morceaux")
+        else -> {
+            val list = playlists!!
+            LazyColumn(Modifier.fillMaxSize()) {
+                itemsIndexed(list, key = { _, it -> it.Id }) { _, pl ->
+                    TrackRow(graph, pl, subtitle = "${pl.ChildCount ?: 0} morceaux")
+                }
             }
         }
     }
 }
-
-/** Petit utilitaire : clic sans effet de ripple (style maquette). */
-fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
-    this.then(Modifier.clickable(onClick = onClick))
