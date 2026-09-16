@@ -28,7 +28,11 @@ android {
         targetSdk = 36
         versionCode = 6
         versionName = "0.7.0"
-        resourceConfigurations += listOf("fr", "en")
+    }
+
+    // Remplace l'ancien `resourceConfigurations`, déprécié dans AGP 9.
+    androidResources {
+        localeFilters += listOf("fr", "en")
     }
 
     if (hasDevKeystore) {

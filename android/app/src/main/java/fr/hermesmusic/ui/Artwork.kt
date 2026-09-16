@@ -52,7 +52,7 @@ object CoverColors {
             val response = client.newCall(Request.Builder().url(url).build()).execute()
             response.use {
                 check(it.isSuccessful) { "HTTP ${it.code}" }
-                val bytes = it.body?.bytes() ?: error("réponse vide")
+                val bytes = it.body.bytes()
                 val bitmap = downscale(bytes)
                 try {
                     val palette = Palette.from(bitmap).clearFilters().generate()

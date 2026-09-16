@@ -154,7 +154,7 @@ class Downloader(
                 val request = Request.Builder().url(r.streamUrl).build()
                 client.newCall(request).execute().use { response ->
                     check(response.isSuccessful) { "HTTP ${response.code}" }
-                    val stream = response.body?.byteStream() ?: error("réponse vide")
+                    val stream = response.body.byteStream()
                     temp.outputStream().use { out -> stream.copyTo(out) }
                 }
                 check(temp.length() > 0) { "fichier vide" }
