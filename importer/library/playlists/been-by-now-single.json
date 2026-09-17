@@ -1,0 +1,20 @@
+{
+ "service": "apple",
+ "kind": "album",
+ "name": "Been By Now - Single",
+ "url": "https://music.apple.com/us/album/been-by-now/6792676858",
+ "fetched": "2026-09-17 11:18:39",
+ "tracks": [
+  {
+   "position": 1,
+   "title": "Been By Now",
+   "artist": "Morgan Wallen",
+   "artists": "Morgan Wallen",
+   "duration_s": 213,
+   "external_id": "6792676860",
+   "source_url": "https://music.apple.com/us/album/been-by-now/6792676858?i=6792676860",
+   "artwork_url": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/9f/8d/52/9f8d52a0-b6d9-d038-327b-4fe58bedce67/26UMGIM94572.rgb.jpg/1000x1000bb.jpg",
+   "album": ""
+  }
+ ]
+}

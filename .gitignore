@@ -1,17 +1,17 @@
-# Secrets / configuration locale
+# Secrets / configuration locale — JAMAIS versionnés, même partiellement.
+# .env porte la clé d'API Jellyfin, le mot de passe du compte d'import et les
+# secrets Spotify ; config/ porte la base Jellyfin (comptes, empreintes de mots
+# de passe, clé d'API, clé du plugin TMDB) et les journaux du serveur.
 .env
-
-# Données d'exécution (config & données de service) — ancrées à la racine,
-# sinon « data/ » masquerait aussi le package Kotlin android/.../data/
 /config/
 /data/
 *.log
 
-# Importateur : venv + données personnelles (listes de pistes, état)
+# Importateur : environnement virtuel (se réinstalle en une commande).
 .venv/
-importer/library/
 
-# Android : sorties de build et fichiers locaux (jamais de keystore en dépôt)
+# Android : sorties de build et fichiers locaux (jamais de keystore en dépôt —
+# une clé de signature permet de publier des mises à jour en ton nom).
 android/.gradle/
 android/.idea/
 android/local.properties
@@ -19,7 +19,6 @@ android/captures/
 android/build/
 android/**/build/
 android/keystore.properties
-*.apk
 *.aab
 *.keystore
 *.jks
@@ -29,11 +28,16 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Maquette et captures : contiennent des noms d'artistes/morceaux personnels
-# (le dépôt est PUBLIC) -> jamais versionnées.
-design/
-web/renders/
-# L'APK est un artefact de build (jamais versionné), mais la page d'installation
-# qui l'accompagne est un vrai fichier du projet : on la ré-inclut.
-web/apk/*
-!web/apk/index.html
+# ---------------------------------------------------------------------------
+# Volontairement PUBLIÉS (le dépôt est public et c'est un choix assumé) :
+#
+#   design/           maquettes de l'interface et rendus
+#   web/renders/      captures d'écran du client web
+#   web/apk/*.apk     l'APK à télécharger, servi aussi par la page d'installation
+#   importer/library/ listes de titres (exports Spotify, « Liked Music »),
+#                     état des imports, corrections d'étiquettes
+#
+# Ces éléments montrent les artistes et les morceaux de la bibliothèque. Rien de
+# tout cela ne donne accès à l'administration : ni clé d'API, ni mot de passe,
+# ni clé de signature.
+# ---------------------------------------------------------------------------

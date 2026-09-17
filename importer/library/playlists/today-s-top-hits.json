@@ -1,0 +1,509 @@
+{
+ "service": "spotify",
+ "kind": "playlist",
+ "name": "Today’s Top Hits",
+ "url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+ "fetched": "2026-09-17 02:14:28",
+ "tracks": [
+  {
+   "position": 1,
+   "title": "BbY WOW",
+   "artist": "KAROL G",
+   "artists": "KAROL G, Judeline, rusowsky",
+   "duration_s": 225,
+   "external_id": "3h5T5JypYU7huFiVYhv1dr",
+   "source_url": "https://open.spotify.com/track/3h5T5JypYU7huFiVYhv1dr",
+   "artwork_url": ""
+  },
+  {
+   "position": 2,
+   "title": "Loser",
+   "artist": "Tame Impala",
+   "artists": "Tame Impala",
+   "duration_s": 223,
+   "external_id": "7bxaFZ1O3cHkgLKMsdC3xR",
+   "source_url": "https://open.spotify.com/track/7bxaFZ1O3cHkgLKMsdC3xR",
+   "artwork_url": ""
+  },
+  {
+   "position": 3,
+   "title": "hate that i made you love me",
+   "artist": "Ariana Grande",
+   "artists": "Ariana Grande",
+   "duration_s": 197,
+   "external_id": "20jbSiX29FDX4oQxBXyUEi",
+   "source_url": "https://open.spotify.com/track/20jbSiX29FDX4oQxBXyUEi",
+   "artwork_url": ""
+  },
+  {
+   "position": 4,
+   "title": "Earrings",
+   "artist": "Malcolm Todd",
+   "artists": "Malcolm Todd",
+   "duration_s": 151,
+   "external_id": "0eAuGrXyGFYwur9ARUe7LJ",
+   "source_url": "https://open.spotify.com/track/0eAuGrXyGFYwur9ARUe7LJ",
+   "artwork_url": ""
+  },
+  {
+   "position": 5,
+   "title": "Bass Persuades",
+   "artist": "Miley Cyrus",
+   "artists": "Miley Cyrus",
+   "duration_s": 202,
+   "external_id": "2FZcjBYK4dTt48q94pJbJD",
+   "source_url": "https://open.spotify.com/track/2FZcjBYK4dTt48q94pJbJD",
+   "artwork_url": ""
+  },
+  {
+   "position": 6,
+   "title": "Ain't In LA",
+   "artist": "ADÉLA",
+   "artists": "ADÉLA",
+   "duration_s": 184,
+   "external_id": "02HyFYmpzt02VJ8k0CqxKj",
+   "source_url": "https://open.spotify.com/track/02HyFYmpzt02VJ8k0CqxKj",
+   "artwork_url": ""
+  },
+  {
+   "position": 7,
+   "title": "stupid song",
+   "artist": "Olivia Rodrigo",
+   "artists": "Olivia Rodrigo",
+   "duration_s": 209,
+   "external_id": "4LfCY65LvojKjWEnU7fNN4",
+   "source_url": "https://open.spotify.com/track/4LfCY65LvojKjWEnU7fNN4",
+   "artwork_url": ""
+  },
+  {
+   "position": 8,
+   "title": "Dai Dai",
+   "artist": "Shakira",
+   "artists": "Shakira, Burna Boy",
+   "duration_s": 223,
+   "external_id": "0kosUz0jePvjiz4ctmR6wL",
+   "source_url": "https://open.spotify.com/track/0kosUz0jePvjiz4ctmR6wL",
+   "artwork_url": ""
+  },
+  {
+   "position": 9,
+   "title": "Animal",
+   "artist": "KATSEYE",
+   "artists": "KATSEYE",
+   "duration_s": 158,
+   "external_id": "3ouNEk0tv5TTi8VWMe1xbX",
+   "source_url": "https://open.spotify.com/track/3ouNEk0tv5TTi8VWMe1xbX",
+   "artwork_url": ""
+  },
+  {
+   "position": 10,
+   "title": "Babydoll",
+   "artist": "Dominic Fike",
+   "artists": "Dominic Fike",
+   "duration_s": 97,
+   "external_id": "7yNf9YjeO5JXUE3JEBgnYc",
+   "source_url": "https://open.spotify.com/track/7yNf9YjeO5JXUE3JEBgnYc",
+   "artwork_url": ""
+  },
+  {
+   "position": 11,
+   "title": "Choosin' Texas",
+   "artist": "Ella Langley",
+   "artists": "Ella Langley",
+   "duration_s": 232,
+   "external_id": "65DbTqJKhbwqYbZ1Okr0rc",
+   "source_url": "https://open.spotify.com/track/65DbTqJKhbwqYbZ1Okr0rc",
+   "artwork_url": ""
+  },
+  {
+   "position": 12,
+   "title": "Self Aware",
+   "artist": "Temper City",
+   "artists": "Temper City",
+   "duration_s": 180,
+   "external_id": "4qW3BbQAwZsrnu8a3ZRdyT",
+   "source_url": "https://open.spotify.com/track/4qW3BbQAwZsrnu8a3ZRdyT",
+   "artwork_url": ""
+  },
+  {
+   "position": 13,
+   "title": "Man I Need",
+   "artist": "Olivia Dean",
+   "artists": "Olivia Dean",
+   "duration_s": 184,
+   "external_id": "1qbmS6ep2hbBRaEZFpn7BX",
+   "source_url": "https://open.spotify.com/track/1qbmS6ep2hbBRaEZFpn7BX",
+   "artwork_url": ""
+  },
+  {
+   "position": 14,
+   "title": "oh yeah?",
+   "artist": "Steve Lacy",
+   "artists": "Steve Lacy",
+   "duration_s": 170,
+   "external_id": "22NHkFYbgxB2Zirj29Gbp8",
+   "source_url": "https://open.spotify.com/track/22NHkFYbgxB2Zirj29Gbp8",
+   "artwork_url": ""
+  },
+  {
+   "position": 15,
+   "title": "petal",
+   "artist": "Ariana Grande",
+   "artists": "Ariana Grande",
+   "duration_s": 184,
+   "external_id": "70pVCVMGjmIWPbWXDwf11e",
+   "source_url": "https://open.spotify.com/track/70pVCVMGjmIWPbWXDwf11e",
+   "artwork_url": ""
+  },
+  {
+   "position": 16,
+   "title": "Talk To You (ft. 54 Ultra)",
+   "artist": "ANOTR",
+   "artists": "ANOTR, 54 Ultra",
+   "duration_s": 191,
+   "external_id": "0kl6Ozan3fuUdCl6TlB15v",
+   "source_url": "https://open.spotify.com/track/0kl6Ozan3fuUdCl6TlB15v",
+   "artwork_url": ""
+  },
+  {
+   "position": 17,
+   "title": "Janice STFU",
+   "artist": "Drake",
+   "artists": "Drake",
+   "duration_s": 237,
+   "external_id": "514joG57v4yKTsfQmz7stz",
+   "source_url": "https://open.spotify.com/track/514joG57v4yKTsfQmz7stz",
+   "artwork_url": ""
+  },
+  {
+   "position": 18,
+   "title": "the cure",
+   "artist": "Olivia Rodrigo",
+   "artists": "Olivia Rodrigo",
+   "duration_s": 297,
+   "external_id": "4EoJ151oQ5jY48z4RhSE96",
+   "source_url": "https://open.spotify.com/track/4EoJ151oQ5jY48z4RhSE96",
+   "artwork_url": ""
+  },
+  {
+   "position": 19,
+   "title": "Rein Me In (with Olivia Dean)",
+   "artist": "Sam Fender",
+   "artists": "Sam Fender, Olivia Dean",
+   "duration_s": 339,
+   "external_id": "7MZHqgTVTnN6xZGYAcEEAf",
+   "source_url": "https://open.spotify.com/track/7MZHqgTVTnN6xZGYAcEEAf",
+   "artwork_url": ""
+  },
+  {
+   "position": 20,
+   "title": "The Fate of Ophelia",
+   "artist": "Taylor Swift",
+   "artists": "Taylor Swift",
+   "duration_s": 226,
+   "external_id": "31TXxq8gfgYyrYClnYY48m",
+   "source_url": "https://open.spotify.com/track/31TXxq8gfgYyrYClnYY48m",
+   "artwork_url": ""
+  },
+  {
+   "position": 21,
+   "title": "DtMF",
+   "artist": "Bad Bunny",
+   "artists": "Bad Bunny",
+   "duration_s": 237,
+   "external_id": "3sK8wGT43QFpWrvNQsrQya",
+   "source_url": "https://open.spotify.com/track/3sK8wGT43QFpWrvNQsrQya",
+   "artwork_url": ""
+  },
+  {
+   "position": 22,
+   "title": "WHERE IS MY HUSBAND!",
+   "artist": "RAYE",
+   "artists": "RAYE",
+   "duration_s": 197,
+   "external_id": "55lijDD6OAjLFFUHU9tcDm",
+   "source_url": "https://open.spotify.com/track/55lijDD6OAjLFFUHU9tcDm",
+   "artwork_url": ""
+  },
+  {
+   "position": 23,
+   "title": "Risk It All",
+   "artist": "Bruno Mars",
+   "artists": "Bruno Mars",
+   "duration_s": 204,
+   "external_id": "5y2ijHECwFYWqcAHKTZgzD",
+   "source_url": "https://open.spotify.com/track/5y2ijHECwFYWqcAHKTZgzD",
+   "artwork_url": ""
+  },
+  {
+   "position": 24,
+   "title": "FALLEN ANGEL",
+   "artist": "JENNIE",
+   "artists": "JENNIE",
+   "duration_s": 199,
+   "external_id": "75QkBCdRc5DGgcyPiVSg4b",
+   "source_url": "https://open.spotify.com/track/75QkBCdRc5DGgcyPiVSg4b",
+   "artwork_url": ""
+  },
+  {
+   "position": 25,
+   "title": "Stop The Wedding!",
+   "artist": "Ashe",
+   "artists": "Ashe",
+   "duration_s": 198,
+   "external_id": "3zOYmiNOuyDL0ClxJcEJ0T",
+   "source_url": "https://open.spotify.com/track/3zOYmiNOuyDL0ClxJcEJ0T",
+   "artwork_url": ""
+  },
+  {
+   "position": 26,
+   "title": "Raindance (feat. Tems)",
+   "artist": "Dave",
+   "artists": "Dave, Tems",
+   "duration_s": 219,
+   "external_id": "3oTuTpF1F3A7rEC6RKsMRz",
+   "source_url": "https://open.spotify.com/track/3oTuTpF1F3A7rEC6RKsMRz",
+   "artwork_url": ""
+  },
+  {
+   "position": 27,
+   "title": "DAISIES",
+   "artist": "Justin Bieber",
+   "artists": "Justin Bieber",
+   "duration_s": 176,
+   "external_id": "5BZsQlgw21vDOAjoqkNgKb",
+   "source_url": "https://open.spotify.com/track/5BZsQlgw21vDOAjoqkNgKb",
+   "artwork_url": ""
+  },
+  {
+   "position": 28,
+   "title": "I Knew It, I Knew You - From \"Toy Story 5\"",
+   "artist": "Taylor Swift",
+   "artists": "Taylor Swift",
+   "duration_s": 178,
+   "external_id": "5uPaqMMt59KGrdKIitDRqa",
+   "source_url": "https://open.spotify.com/track/5uPaqMMt59KGrdKIitDRqa",
+   "artwork_url": ""
+  },
+  {
+   "position": 29,
+   "title": "Stateside + Zara Larsson",
+   "artist": "PinkPantheress",
+   "artists": "PinkPantheress, Zara Larsson",
+   "duration_s": 184,
+   "external_id": "1DwscornXpj8fmOmYVlqZt",
+   "source_url": "https://open.spotify.com/track/1DwscornXpj8fmOmYVlqZt",
+   "artwork_url": ""
+  },
+  {
+   "position": 30,
+   "title": "Jamaican (Bam Bam)",
+   "artist": "HUGEL",
+   "artists": "HUGEL, SOLTO (FR)",
+   "duration_s": 156,
+   "external_id": "7e4zDInS6tA2jwzphvs2Ay",
+   "source_url": "https://open.spotify.com/track/7e4zDInS6tA2jwzphvs2Ay",
+   "artwork_url": ""
+  },
+  {
+   "position": 31,
+   "title": "Nicole Kidman",
+   "artist": "ADÉLA",
+   "artists": "ADÉLA",
+   "duration_s": 181,
+   "external_id": "70cHKK8bHAfJrOGVnfRG9J",
+   "source_url": "https://open.spotify.com/track/70cHKK8bHAfJrOGVnfRG9J",
+   "artwork_url": ""
+  },
+  {
+   "position": 32,
+   "title": "So Easy (To Fall In Love)",
+   "artist": "Olivia Dean",
+   "artists": "Olivia Dean",
+   "duration_s": 169,
+   "external_id": "6sGIMrtIzQjdzNndVxe397",
+   "source_url": "https://open.spotify.com/track/6sGIMrtIzQjdzNndVxe397",
+   "artwork_url": ""
+  },
+  {
+   "position": 33,
+   "title": "bloodstream",
+   "artist": "Alyssa Grace",
+   "artists": "Alyssa Grace",
+   "duration_s": 177,
+   "external_id": "2oWFJJW9d1bIra3zHjR6GO",
+   "source_url": "https://open.spotify.com/track/2oWFJJW9d1bIra3zHjR6GO",
+   "artwork_url": ""
+  },
+  {
+   "position": 34,
+   "title": "SaWaDiKa",
+   "artist": "LISA",
+   "artists": "LISA",
+   "duration_s": 188,
+   "external_id": "1VWiDyYTrqQhhmnWANWkFa",
+   "source_url": "https://open.spotify.com/track/1VWiDyYTrqQhhmnWANWkFa",
+   "artwork_url": ""
+  },
+  {
+   "position": 35,
+   "title": "Midnight Sun",
+   "artist": "Zara Larsson",
+   "artists": "Zara Larsson",
+   "duration_s": 189,
+   "external_id": "37UCSVSqiPGdR1DijOFyYY",
+   "source_url": "https://open.spotify.com/track/37UCSVSqiPGdR1DijOFyYY",
+   "artwork_url": ""
+  },
+  {
+   "position": 36,
+   "title": "Hootie Frutti",
+   "artist": "KATSEYE",
+   "artists": "KATSEYE",
+   "duration_s": 140,
+   "external_id": "6oUUmBcUbZa5O48V5pjgAD",
+   "source_url": "https://open.spotify.com/track/6oUUmBcUbZa5O48V5pjgAD",
+   "artwork_url": ""
+  },
+  {
+   "position": 37,
+   "title": "Orbiter",
+   "artist": "Noah Kahan",
+   "artists": "Noah Kahan",
+   "duration_s": 286,
+   "external_id": "4W6yulge3h7FSy0zGFrNKs",
+   "source_url": "https://open.spotify.com/track/4W6yulge3h7FSy0zGFrNKs",
+   "artwork_url": ""
+  },
+  {
+   "position": 38,
+   "title": "Great Expectation",
+   "artist": "SIENNA SPIRO",
+   "artists": "SIENNA SPIRO",
+   "duration_s": 173,
+   "external_id": "7ujApz6iFP3PmKIDGcaGbe",
+   "source_url": "https://open.spotify.com/track/7ujApz6iFP3PmKIDGcaGbe",
+   "artwork_url": ""
+  },
+  {
+   "position": 39,
+   "title": "Manchild",
+   "artist": "Sabrina Carpenter",
+   "artists": "Sabrina Carpenter",
+   "duration_s": 213,
+   "external_id": "42UBPzRMh5yyz0EDPr6fr1",
+   "source_url": "https://open.spotify.com/track/42UBPzRMh5yyz0EDPr6fr1",
+   "artwork_url": ""
+  },
+  {
+   "position": 40,
+   "title": "Boston",
+   "artist": "STELLA LEFTY",
+   "artists": "STELLA LEFTY",
+   "duration_s": 170,
+   "external_id": "36idurZmYRjJ56KQ8JD9bN",
+   "source_url": "https://open.spotify.com/track/36idurZmYRjJ56KQ8JD9bN",
+   "artwork_url": ""
+  },
+  {
+   "position": 41,
+   "title": "Homewrecker",
+   "artist": "sombr",
+   "artists": "sombr",
+   "duration_s": 209,
+   "external_id": "7tICCrK3CcyRFKza7yrR0z",
+   "source_url": "https://open.spotify.com/track/7tICCrK3CcyRFKza7yrR0z",
+   "artwork_url": ""
+  },
+  {
+   "position": 42,
+   "title": "NOBLE",
+   "artist": "F3miii",
+   "artists": "F3miii",
+   "duration_s": 185,
+   "external_id": "2LSmH4vxyRhkJ2pPqcmkXw",
+   "source_url": "https://open.spotify.com/track/2LSmH4vxyRhkJ2pPqcmkXw",
+   "artwork_url": ""
+  },
+  {
+   "position": 43,
+   "title": "Been By Now",
+   "artist": "Morgan Wallen",
+   "artists": "Morgan Wallen",
+   "duration_s": 213,
+   "external_id": "3xwMjQriBVW0OGEvNKo9c0",
+   "source_url": "https://open.spotify.com/track/3xwMjQriBVW0OGEvNKo9c0",
+   "artwork_url": ""
+  },
+  {
+   "position": 44,
+   "title": "I Just Might",
+   "artist": "Bruno Mars",
+   "artists": "Bruno Mars",
+   "duration_s": 212,
+   "external_id": "12bYYQaLqHliSXvRIYlq8G",
+   "source_url": "https://open.spotify.com/track/12bYYQaLqHliSXvRIYlq8G",
+   "artwork_url": ""
+  },
+  {
+   "position": 45,
+   "title": "Be Her",
+   "artist": "Ella Langley",
+   "artists": "Ella Langley",
+   "duration_s": 217,
+   "external_id": "05CjWFAcAlY6O9po6Qwakk",
+   "source_url": "https://open.spotify.com/track/05CjWFAcAlY6O9po6Qwakk",
+   "artwork_url": ""
+  },
+  {
+   "position": 46,
+   "title": "CLICK",
+   "artist": "JISOO",
+   "artists": "JISOO",
+   "duration_s": 159,
+   "external_id": "1zyNO73bPNPC6KBi3raNmZ",
+   "source_url": "https://open.spotify.com/track/1zyNO73bPNPC6KBi3raNmZ",
+   "artwork_url": ""
+  },
+  {
+   "position": 47,
+   "title": "Sue me",
+   "artist": "Audrey Hobert",
+   "artists": "Audrey Hobert",
+   "duration_s": 170,
+   "external_id": "6ZAuQOgLrNQb9s7BXheuTy",
+   "source_url": "https://open.spotify.com/track/6ZAuQOgLrNQb9s7BXheuTy",
+   "artwork_url": ""
+  },
+  {
+   "position": 48,
+   "title": "White Keys",
+   "artist": "Dominic Fike",
+   "artists": "Dominic Fike",
+   "duration_s": 144,
+   "external_id": "5ViLKrbyL3HD6wsq3AB9eI",
+   "source_url": "https://open.spotify.com/track/5ViLKrbyL3HD6wsq3AB9eI",
+   "artwork_url": ""
+  },
+  {
+   "position": 49,
+   "title": "iloveitiloveitiloveit",
+   "artist": "Bella Kay",
+   "artists": "Bella Kay",
+   "duration_s": 183,
+   "external_id": "5IMpnpD0tQVcqWlVIgtAtV",
+   "source_url": "https://open.spotify.com/track/5IMpnpD0tQVcqWlVIgtAtV",
+   "artwork_url": ""
+  },
+  {
+   "position": 50,
+   "title": "SWIM",
+   "artist": "BTS",
+   "artists": "BTS",
+   "duration_s": 159,
+   "external_id": "68lbSrXDORS51pmyjZv712",
+   "source_url": "https://open.spotify.com/track/68lbSrXDORS51pmyjZv712",
+   "artwork_url": ""
+  }
+ ]
+}
