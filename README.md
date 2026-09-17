@@ -111,6 +111,25 @@ récupérés par **URL directe** (pas de recherche approximative) et télécharg
 connue : certains titres sont protégés par un *PO token* et restent hors de
 portée de yt-dlp, même avec des cookies.
 
+Correction des étiquettes (`fix-youtube-tags.py`) : l'import ne lisait que le
+**titre de la vidéo**, d'où des artistes et des titres approximatifs. Or YouTube
+Music expose les métadonnées **officielles** (`track`, `artist`, `album`, date)
+quand la vidéo correspond à une vraie sortie musicale — vérifié : 12 vidéos sur 59.
+Celles-là reçoivent leurs vrais artiste, album et année. Pour les autres (ré-uploads
+« slowed + reverb », animations de fan) il n'existe pas de métadonnées officielles :
+seul le bruit est retiré (hashtags, `@mentions`, « (Official Video) », « (Lyrics) »),
+en préservant `slowed`, `reverb`, `remix` — ce sont des versions distinctes.
+Les caractères de police détournés sont normalisés (`𝙏𝙖𝙩𝙡𝙞` → `Tatli`), ce qui rend
+les morceaux trouvables. Aucun retéléchargement : seule l'étiquette est réécrite.
+Les doublons sont **refusés**, jamais créés, et chaque passage écrit sa trace
+avant/après dans `importer/library/tag_corrections.json`.
+
+```bash
+tools/fix-youtube-tags.py --fetch     # interroge YouTube (mis en cache)
+tools/fix-youtube-tags.py             # montre avant/après, ne change rien
+tools/fix-youtube-tags.py --apply     # applique
+```
+
 ## Connecteurs de playlists
 
 Importer une playlist ou un album Spotify / Apple Music / YouTube Music dans la

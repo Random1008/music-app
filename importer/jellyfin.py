@@ -127,7 +127,7 @@ def forget_token() -> None:
 # Bibliothèque
 # --------------------------------------------------------------------------- #
 
-FIELDS = "Artists,Album,AlbumArtist,RunTimeTicks,ProductionYear"
+FIELDS = "Artists,Album,AlbumArtist,RunTimeTicks,ProductionYear,Path"
 
 
 def library_index(user_id: str | None = None) -> dict:
