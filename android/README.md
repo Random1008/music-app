@@ -119,13 +119,13 @@ Le mode et l'accent sont persistés dans DataStore et appliqués au démarrage.
 
 ## Où le projet est compilé, et pourquoi pas ici
 
-Le serveur de développement (le NAS) est **Linux** et n'a aucun outil Android :
+Le NAS n'a aucun outil Android :
 les outils officiels (aapt2 notamment) ne sont publiés que pour x86_64. La
 compilation se fait donc sur un **hôte de build x86_64** (JDK 17 + SDK Android),
 et l'APK est rapatrié pour être installé sur le téléphone.
 
 ```
-NAS (Linux)                    Hôte de build (x86_64)
+NAS                            Hôte de build (x86_64)
   code source ── git push ──▶ clone ── ./gradlew assembleDebug ──▶ APK
     ▲                                                              │
     └────────────────────── rapatriement ◀─────────────────────────┘

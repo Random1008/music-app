@@ -42,7 +42,6 @@ import kotlinx.coroutines.launch
 fun LoginScreen(graph: AppGraph) {
     // Adresse par défaut : le nom Tailscale public (HTTPS) — l'app fonctionne
     // donc aussi bien sur le tailnet que depuis n'importe où sur Internet.
-    // Le tailnet reste utilisable en secours : http://100.64.0.0:8096
     var serverUrl by remember { mutableStateOf("https://dh4300plus-59ae.tailb74e62.ts.net") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

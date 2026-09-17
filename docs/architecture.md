@@ -33,7 +33,7 @@ Jellyfin en lecture seule.
 
 ## Choix techniques
 
-- **Jellyfin** — image `linuxserver/jellyfin` (support Linux, contrôle PUID/PGID).
+- **Jellyfin** — image `linuxserver/jellyfin` (contrôle PUID/PGID).
   C'est la source de vérité : bibliothèque, streaming, playlists, historique,
   favoris. Aucun backend custom ne duplique ces fonctions.
 - **Stockage** — bibliothèque dans `${MUSIC_LIBRARY_PATH}` (défaut `/srv/music`),
@@ -63,9 +63,10 @@ Jellyfin n'est pointé que sur `Artists/` pour ne pas indexer `Incoming/` et `Fa
 
 ## Sécurité
 
-- Aucun secret dans Git : `.env` (identifiants, clés API) est ignoré.
-- Les données personnelles (listes de pistes, état d'import) sont sous
-  `importer/library/`, également ignoré.
+- Aucun secret dans Git : `.env` (identifiants, clés API) et `config/` (la base
+  Jellyfin : comptes, empreintes de mots de passe, clé d'API) sont ignorés.
+- Les listes de pistes et l'état des imports, sous `importer/library/`, sont
+  versionnés : le dépôt public les publie volontairement.
 
 ## Roadmap
 

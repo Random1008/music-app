@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- HTTPS autorisé partout ; le trafic EN CLAIR n'est permis QUE vers le
-     serveur personnel (réseau local + tailnet Tailscale). Jamais en global.
+<!-- HTTPS autorisé partout ; le trafic EN CLAIR n'est permis QUE vers les
+     adresses personnelles du serveur, jamais en global.
 
-     En pratique l'app utilise https://<nom-tailscale> (Funnel) : aucun besoin
-     de cleartext. Ces entrées servent de secours si on saisit l'IP du tailnet
-     ou l'adresse locale. -->
+     L'application utilise https://<nom-tailscale> (Funnel) : aucun besoin de
+     cleartext. Les entrées ci-dessous ne servent qu'aux adresses de secours.
+
+     Les IP internes (tailnet, réseau local) ne sont pas écrites ici : elles
+     dépendent du réseau de chacun. Pour utiliser une adresse en http://,
+     ajoute-la en <domain> dans le bloc ci-dessous. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
 
     <domain-config cleartextTrafficPermitted="true">
-        <!-- tailnet Tailscale -->
-        <domain includeSubdomains="true">100.64.0.0</domain>
         <domain includeSubdomains="true">dh4300plus-59ae.tailb74e62.ts.net</domain>
-        <!-- réseau local -->
-        <domain includeSubdomains="true">192.168.0.0</domain>
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
     </domain-config>

@@ -33,11 +33,16 @@ __pycache__/
 #
 #   design/           maquettes de l'interface et rendus
 #   web/renders/      captures d'écran du client web
-#   web/apk/*.apk     l'APK à télécharger, servi aussi par la page d'installation
 #   importer/library/ listes de titres (exports Spotify, « Liked Music »),
 #                     état des imports, corrections d'étiquettes
 #
 # Ces éléments montrent les artistes et les morceaux de la bibliothèque. Rien de
 # tout cela ne donne accès à l'administration : ni clé d'API, ni mot de passe,
 # ni clé de signature.
+#
+# L'APK, lui, n'est PAS versionné : il embarque en dur les adresses de secours du
+# serveur (IP du tailnet, IP locale) qui n'ont pas à être publiées. Il est servi
+# par la page d'installation, depuis le serveur, à l'endroit où il est construit.
 # ---------------------------------------------------------------------------
+web/apk/*.apk
+

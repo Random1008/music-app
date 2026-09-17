@@ -61,8 +61,8 @@ SECRETS = [os.path.join(ROOT, ".env"), os.path.join(HOME, ".config", "hermes-mus
 STATE = os.path.join(HOME, ".local", "state", "hermes-music")
 LOG = os.path.join(STATE, "backup.log")
 STATUS = os.path.join(STATE, "backup-status.json")
-REMOTE_BASE = "/home/<utilisateur>/backups/hermes-music"
-SSH_HOST = "backup-vps"          # raccourci défini dans ~/.ssh/config
+REMOTE_BASE = os.environ.get("REMOTE_BASE", "~/backups/hermes-music")
+SSH_HOST = os.environ.get("BACKUP_SSH_HOST", "backup-vps")   # raccourci ~/.ssh/config
 
 # La base SQLite vivante est exclue : l'archive Jellyfin (étape 1) la remplace par
 # une copie cohérente. L'inclure exposerait à une base corrompue et inutilisable.
@@ -168,7 +168,7 @@ def jellyfin_backup(essais: int = 3) -> str:
 
 def rsync_copy(label: str, src: str, dest: str, link_dest: str, excludes, dry: bool) -> None:
     """[dest] DOIT porter le préfixe « hôte: » — sans lui, rsync croit à une copie
-    locale et tente d'écrire sur le NAS (/home/<utilisateur> n'y existe pas), avec une
+    local et tente d'écrire sur le NAS (le chemin distant n'y existe pas), avec une
     erreur trompeuse : « mkdir … Permission denied ». Panne rencontrée quatre fois
     avant d'être isolée. [link_dest], lui, reste un chemin SANS préfixe : rsync
     l'interprète du côté distant.
