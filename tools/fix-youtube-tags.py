@@ -62,6 +62,29 @@ BRUIT = re.compile(
     r"visuali[sz]er|animation|full version|m/v)[^\)\]\}]*[\)\]\}]"
     r"|#\w+|@[\w.-]+", re.I)
 
+# Variantes du morceau, à NE PAS perdre même quand elles se trouvent dans un
+# crochet jugé bruyant : « [Slowed + Lyrics] » doit devenir « (Slowed) », pas
+# disparaître. C'est une information sur le morceau, pas du bruit.
+VERSIONS = re.compile(r"slowed|reverb|remix|sped\s*up|hardtekk|nightcore|"
+                      r"instrumental|extended|super", re.I)
+
+
+def clean_title(title: str) -> str:
+    """Retire le bruit du titre, en conservant les variantes (« slowed », …)."""
+    marques = []
+    for trouve in BRUIT.finditer(title or ""):
+        for mot in VERSIONS.findall(trouve.group(0)):
+            marques.append(" ".join(mot.split()).title())
+    t = BRUIT.sub(" ", title or "")
+    t = re.sub(r"\s*[\(\[]\s*[\)\]]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip(" -–—|_")
+    t = t or title or "?"
+    if marques:
+        suffixe = " + ".join(dict.fromkeys(marques))
+        if suffixe.lower() not in t.lower():
+            t = "%s (%s)" % (t, suffixe)
+    return t
+
 
 def log(msg):
     print(msg, flush=True)
@@ -108,13 +131,6 @@ def entries() -> list:
         if path and os.path.exists(path):
             out.append((vid, path))
     return out
-
-
-def clean_title(title: str) -> str:
-    t = BRUIT.sub(" ", title or "")
-    t = re.sub(r"\s*[\(\[]\s*[\)\]]", " ", t)
-    t = re.sub(r"\s+", " ", t).strip(" -–—|_")
-    return t or title or "?"
 
 
 def de_stylise(texte: str) -> str:
