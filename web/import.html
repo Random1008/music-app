@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#08090f">
+<title>Importer une playlist — Hermes Music</title>
+<style>
+  :root { --bg:#08090f; --surface:#1F2130; --surface2:#171926; --ink:#E9E9ED;
+          --dim:#9397AB; --dim2:#75798C; --acc:#7C5CFF; --ring:rgba(233,233,237,.09);
+          --ok:#42C08A; --ko:#E0609B; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+         display:flex; justify-content:center; padding:26px 16px 60px; }
+  main { width:100%; max-width:660px; }
+  .kicker { font:500 10px ui-monospace,Menlo,monospace; letter-spacing:.14em; color:var(--acc) }
+  h1 { font-size:25px; font-weight:500; letter-spacing:-.02em; margin:10px 0 6px }
+  .sub { color:var(--dim); font-size:13px; line-height:1.6; margin-bottom:22px }
+  label { display:block; font:500 10px ui-monospace,Menlo,monospace; letter-spacing:.12em;
+          color:var(--dim2); margin:16px 0 7px }
+  input[type=text] { width:100%; padding:13px 14px; border-radius:10px; font-size:14.5px;
+          background:var(--surface2); color:var(--ink); border:1px solid var(--hairline,#2A2D3E);
+          outline:none }
+  input[type=text]:focus { border-color:var(--acc) }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px }
+  button { flex:1 1 180px; padding:14px; border-radius:999px; border:0; font-size:14.5px;
+           font-weight:500; cursor:pointer; font-family:inherit }
+  .primary { background:var(--acc); color:#0E0F18 }
+  .ghost { background:var(--surface2); color:var(--ink);
+           box-shadow:inset 0 0 0 1px var(--ring) }
+  button:disabled { opacity:.5; cursor:default }
+  .state { margin-top:22px; padding:14px; border-radius:10px; background:var(--surface2);
+           box-shadow:inset 0 0 0 1px var(--ring); font-size:12.5px; color:var(--dim) }
+  pre { margin:14px 0 0; padding:13px; border-radius:10px; background:#0C0D14;
+        box-shadow:inset 0 0 0 1px var(--ring); color:var(--dim);
+        font:400 11.5px/1.55 ui-monospace,Menlo,monospace; white-space:pre-wrap;
+        word-break:break-word; max-height:52vh; overflow:auto }
+  .badge { display:inline-block; padding:3px 9px; border-radius:999px; font:500 10px
+           ui-monospace,Menlo,monospace; letter-spacing:.1em; margin-bottom:10px }
+  .run { background:rgba(124,92,255,.18); color:#B9A5FF }
+  .done { background:rgba(66,192,138,.16); color:var(--ok) }
+  .fail { background:rgba(224,96,155,.16); color:var(--ko) }
+  a { color:var(--acc) }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">HERMES MUSIC</div>
+  <h1>Importer une playlist</h1>
+  <div class="sub">
+    Colle le lien d'une playlist ou d'un album <b>Spotify</b>, <b>Apple Music</b> ou
+    <b>YouTube Music</b>. Ces services ne fournissent que <b>la liste des titres</b> :
+    l'audio est récupéré sur YouTube, comme le reste de la bibliothèque.<br>
+    Les morceaux déjà présents ne sont pas retéléchargés, et la playlist est créée
+    dans l'ordre d'origine.
+  </div>
+
+  <label for="url">LIEN DE LA PLAYLIST</label>
+  <input id="url" type="text" inputmode="url" autocomplete="off" spellcheck="false"
+         placeholder="https://open.spotify.com/playlist/…">
+
+  <label for="name">NOM DANS HERMES MUSIC (facultatif)</label>
+  <input id="name" type="text" autocomplete="off" placeholder="nom d'origine par défaut">
+
+  <label for="limit">LIMITER AUX N PREMIERS TITRES (facultatif, pour essayer)</label>
+  <input id="limit" type="text" inputmode="numeric" autocomplete="off" placeholder="ex. 5">
+
+  <div class="row">
+    <button class="ghost" id="preview">Prévisualiser</button>
+    <button class="primary" id="start">Importer</button>
+  </div>
+
+  <div class="state" id="state">Aucun import en cours.</div>
+  <pre id="log" hidden></pre>
+  <p style="color:var(--dim2);font-size:12px;margin-top:20px">
+    <a href="/">← Retour au client web</a>
+  </p>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let job = null, timer = null;
+
+function setState(html) { $('state').innerHTML = html; }
+
+function render(state) {
+  if (!state || !state.id) { setState('Aucun import en cours.'); return; }
+  const badge = state.running ? '<span class="badge run">EN COURS</span>'
+    : (state.code === 0 ? '<span class="badge done">TERMINÉ</span>'
+                        : '<span class="badge fail">ÉCHEC</span>');
+  const quoi = (state.dry_run ? 'Prévisualisation' : 'Import') + ' — ' +
+               (state.name ? state.name + ' · ' : '') + state.url;
+  setState(badge + '<div style="word-break:break-all">' + quoi + '</div>');
+  const log = $('log');
+  log.hidden = false;
+  log.textContent = (state.lines || []).join('\n');
+  log.scrollTop = log.scrollHeight;
+  if (!state.running && timer) { clearInterval(timer); timer = null; busy(false); }
+}
+
+function busy(on) {
+  $('start').disabled = on;
+  $('preview').disabled = on;
+}
+
+async function poll() {
+  try {
+    const r = await fetch('/import/state', { cache: 'no-store' });
+    render(await r.json());
+  } catch (e) { /* le serveur a peut-être redémarré */ }
+}
+
+async function launch(dryRun) {
+  const url = $('url').value.trim();
+  if (!url) { setState('Colle d\'abord un lien.'); return; }
+  busy(true);
+  setState('Lancement…');
+  $('log').hidden = false;
+  $('log').textContent = '';
+  try {
+    const r = await fetch('/import/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url,
+        name: $('name').value.trim(),
+        limit: $('limit').value.trim(),
+        dry_run: dryRun,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { setState('<span class="badge fail">REFUSÉ</span>' + (data.erreur || '')); busy(false); return; }
+    job = data.id;
+    if (timer) clearInterval(timer);
+    timer = setInterval(poll, 1500);
+    poll();
+  } catch (e) {
+    setState('<span class="badge fail">ERREUR</span>' + e.message);
+    busy(false);
+  }
+}
+
+$('start').addEventListener('click', () => launch(false));
+$('preview').addEventListener('click', () => launch(true));
+$('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') launch(false); });
+poll();
+setInterval(() => { if (!timer) poll(); }, 4000);
+</script>
+</body>
+</html>

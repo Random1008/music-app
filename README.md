@@ -21,7 +21,8 @@ Plateforme personnelle de streaming musical auto-hébergée.
 - [x] V0.7 — Accès distant (Tailscale Funnel, HTTPS Let's Encrypt)
 - [x] V0.8 — Mode hors-ligne (téléchargement, écoute sans réseau)
 - [x] Connecteurs — import de playlists Spotify / Apple Music / YouTube Music
-- [~] V1.0 — Production : tests unitaires faits ; **sauvegardes et monitoring à faire**
+- [x] Sauvegarde hors site, surveillance, et exposition publique corrigée
+- [x] V1.0 — Production : tests unitaires, sauvegarde vérifiée par restauration, surveillance
 
 ## Architecture
 
@@ -138,11 +139,44 @@ compte. Les listes privées demandent un compte — c'est possible pour YouTube 
 Détail de ce qui marche, de ce qui est impossible et des pièges vérifiés :
 `docs/connecteurs.md`.
 
+La même chose est disponible dans le navigateur, sur le port non exposé :
+`http://<nas>:8092/import` — un champ, deux boutons (Prévisualiser / Importer),
+et le journal de progression en direct.
+
+## Sauvegarde et surveillance
+
+```bash
+tools/backup.py              # sauvegarde hors site + vérification réelle
+tools/backup.py --verify-only   # revérifie la dernière sans rien copier
+```
+
+La copie part sur le VPS (autre machine, autre bâtiment) : bibliothèque,
+configuration Jellyfin — dont une **archive de base cohérente** produite par
+Jellyfin lui-même —, dépôt, secrets, et le keystore qui signe les APK.
+
+Le script ne se contente pas de vérifier que rsync a renvoyé 0 : il compare les
+nombres, fait relire les empreintes SHA-256 **par le VPS**, **rapatrie réellement
+quelques fichiers** et les compare octet par octet, et ouvre l'archive Jellyfin.
+Premier passage : 2,6 Go. Passe suivante : 22 secondes.
+
+Deux tâches planifiées (04:30 pour la sauvegarde, toutes les 6 h pour la
+surveillance) n'écrivent **que** s'il y a un problème — le silence veut dire que
+tout va bien. La surveillance contrôle aussi que le port public ne sert que la
+page APK.
+
+**Exposition** : le Funnel Tailscale ne publie que le port 8091, qui ne sert plus
+que `/apk/`. Le client web, la page d'import et le pont Jellyfin sont sur le port
+8092, non exposé. Auparavant, le port public servait tout — dont un pont qui
+injectait la clé API, ce qui rendait la bibliothèque lisible par n'importe qui.
+
+Procédure de restauration, pièges et détails : `docs/exploitation.md`.
+
 ## Documentation
 
 - `docs/architecture.md` — choix techniques
 - `docs/app-ui-spec.md` — spécification UI/UX de l'application Android
 - `docs/access.md` — adresses d'accès et exposition publique
 - `docs/connecteurs.md` — import de playlists Spotify / Apple Music / YouTube Music
+- `docs/exploitation.md` — sauvegarde, restauration, surveillance, exposition
 - `android/README.md` — application Android : fonctionnalités, structure, tests
 - `web/README.md` — client web
