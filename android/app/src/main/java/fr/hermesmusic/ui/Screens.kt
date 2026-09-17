@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -36,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -92,6 +95,8 @@ fun HomeTab(graph: AppGraph, onOpenSearch: () -> Unit) {
     var played by remember { mutableStateOf<List<JfItem>>(emptyList()) }
     var favorites by remember { mutableStateOf<List<JfItem>>(emptyList()) }
     var playlists by remember { mutableStateOf<List<JfItem>>(emptyList()) }
+    var mix by remember { mutableStateOf<List<JfItem>>(emptyList()) }
+    var moreRows by remember { mutableStateOf<List<Pair<String, List<JfItem>>>>(emptyList()) }
     var counts by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -100,7 +105,7 @@ fun HomeTab(graph: AppGraph, onOpenSearch: () -> Unit) {
             val recentAlbums = graph.repo.recentAlbums(limit = 12)
             added = graph.repo.recentTracks(limit = 6).Items
             resume = graph.repo.resumeAudio(limit = 5).Items
-            played = graph.repo.recentlyPlayed(limit = 8).Items
+            played = graph.repo.recentlyPlayed(limit = 20).Items
             favorites = graph.repo.favorites().Items.take(12)
             playlists = graph.repo.playlists().Items.take(12)
             val totalAlbums = graph.repo.albums(limit = 1).TotalRecordCount
@@ -108,6 +113,29 @@ fun HomeTab(graph: AppGraph, onOpenSearch: () -> Unit) {
             val totalArtists = graph.repo.artists(limit = 1).TotalRecordCount
             albums = recentAlbums.Items
             counts = "$totalTracks morceaux · $totalAlbums albums · $totalArtists artistes"
+
+            // Rangées de recommandation, construites uniquement à partir de ce que
+            // tu écoutes et de ce que tu as mis en favori : les artistes qui
+            // reviennent le plus souvent. Aucun service externe, aucun classement
+            // opaque — juste ta propre bibliothèque, réordonnée.
+            val seeds = (played + favorites + resume)
+                .flatMap { it.artistIds }
+                .groupingBy { it }
+                .eachCount()
+                .entries
+                .sortedByDescending { it.value }
+                .map { it.key }
+                .take(3)
+            val byArtist = seeds.mapNotNull { id ->
+                runCatching { graph.repo.artistTracks(id).Items }
+                    .getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { id to it }
+            }
+            mix = interleave(byArtist.map { it.second }, limit = 15)
+            moreRows = byArtist.take(2).map { (_, tracks) ->
+                tracks.first().artistLine to tracks.take(10)
+            }
         }.onFailure { error = it.message ?: "Erreur réseau" }
     }
 
@@ -151,6 +179,22 @@ fun HomeTab(graph: AppGraph, onOpenSearch: () -> Unit) {
         if (played.isNotEmpty()) {
             item { SectionHeader("Récemment écouté") }
             item { RecentGrid(graph, played.take(6)) { index -> graph.play(played, index) } }
+        }
+
+        // --- Mix du jour : tes artistes les plus écoutés, en alternance ---
+        if (mix.isNotEmpty()) {
+            item { SectionHeader("Mix du jour", "Tout lire") { graph.play(mix, 0) } }
+            item { TrackCarousel(graph, mix) { index -> graph.play(mix, index) } }
+        }
+
+        // --- Plus de <artiste> : de quoi rester dans le même univers ---
+        moreRows.forEach { (name, tracks) ->
+            item(key = "plus-$name") {
+                SectionHeader("Plus de $name", "Tout lire") { graph.play(tracks, 0) }
+            }
+            item(key = "plusrow-$name") {
+                TrackCarousel(graph, tracks) { index -> graph.play(tracks, index) }
+            }
         }
 
         // --- Albums récents ---
@@ -240,6 +284,53 @@ fun HomeTab(graph: AppGraph, onOpenSearch: () -> Unit) {
             item { SectionHeader("Récemment ajouté") }
             itemsIndexed(added, key = { _, it -> "n" + it.Id }) { index, t ->
                 TrackRow(graph, t) { graph.play(added, index) }
+            }
+        }
+    }
+}
+
+/**
+ * Entrelace plusieurs listes de morceaux, un titre de chacune à tour de rôle.
+ *
+ * C'est ce qui donne au « Mix du jour » son intérêt : sans cela, les morceaux
+ * d'un même artiste s'enchaîneraient en bloc et la file d'attente sonnerait
+ * comme un album plutôt que comme une sélection.
+ */
+private fun interleave(lists: List<List<JfItem>>, limit: Int): List<JfItem> {
+    val out = mutableListOf<JfItem>()
+    var index = 0
+    while (out.size < limit) {
+        var progressed = false
+        for (list in lists) {
+            if (out.size >= limit) break
+            if (index < list.size) {
+                out += list[index]
+                progressed = true
+            }
+        }
+        if (!progressed) break
+        index++
+    }
+    return out.distinctBy { it.Id }
+}
+
+/** Rangée horizontale de pochettes, pour le mix et les « Plus de … ». */
+@Composable
+private fun TrackCarousel(graph: AppGraph, items: List<JfItem>, onPlay: (Int) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        itemsIndexed(items, key = { _, it -> "c" + it.Id }) { index, track ->
+            Column(
+                Modifier
+                    .width(104.dp)
+                    .clickable { onPlay(index) },
+            ) {
+                Cover(graph, track, 104.dp)
+                Spacer(Modifier.height(7.dp))
+                Text(track.Name ?: "", color = Nocturne.Ink, fontSize = 12.sp, maxLines = 1)
+                Text(track.artistLine, color = Nocturne.Dim, fontSize = 11.sp, maxLines = 1)
             }
         }
     }
@@ -571,9 +662,16 @@ fun LibraryTab(graph: AppGraph) {
     var creating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableIntStateOf(0) }
+    var favoriteCount by remember { mutableIntStateOf(0) }
     val downloads by graph.downloadEntries.collectAsStateWithLifecycle()
     val downloadedIds = remember(downloads) { downloads.map { it.itemId }.toSet() }
     val scope = rememberCoroutineScope()
+
+    // Nombre de favoris, pour l'entrée épinglée en haut : c'est le seul chiffre
+    // qu'on veut connaître sans ouvrir le filtre.
+    LaunchedEffect(reloadKey) {
+        favoriteCount = runCatching { graph.repo.favorites().TotalRecordCount }.getOrDefault(0)
+    }
 
     LaunchedEffect(mode, reloadKey) {
         if (mode == FILTER_DOWNLOADS) {
@@ -634,6 +732,10 @@ fun LibraryTab(graph: AppGraph) {
                     }
                 }
             }
+
+            // Entrée épinglée, en tête de bibliothèque : le premier repère qu'on
+            // cherche dans une application de streaming, avant les filtres.
+            item { LikedSongsCard(favoriteCount) { mode = 4 } }
 
             item {
                 LazyRow(
@@ -747,6 +849,62 @@ fun LibraryTab(graph: AppGraph) {
                             .onFailure { error = it.message ?: "Création impossible" }
                     }
                 },
+            )
+        }
+    }
+}
+
+/**
+ * Entrée épinglée « Titres likés », avec son propre dégradé.
+ *
+ * Le dégradé part de l'accent choisi dans les paramètres et s'assombrit vers le
+ * fond : la carte a donc une couleur bien à elle, sans jamais jurer avec le
+ * thème (l'accent peut être violet, cyan, vert, ambre ou rose).
+ */
+@Composable
+private fun LikedSongsCard(count: Int, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(Nocturne.Accent, lerp(Nocturne.Accent, Nocturne.Bg, 0.62f)),
+                )
+            )
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(66.dp)
+                .background(Nocturne.Scrim),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = Nocturne.Ink,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Titres likés",
+                color = Nocturne.Ink,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                if (count > 0) "$count morceaux"
+                else "Touche le cœur d'un morceau pour le retrouver ici",
+                color = Nocturne.Ink.copy(alpha = 0.78f),
+                fontSize = 12.sp,
+                maxLines = 1,
+                modifier = Modifier.padding(end = 12.dp),
             )
         }
     }

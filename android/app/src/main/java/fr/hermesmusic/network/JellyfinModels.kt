@@ -36,6 +36,12 @@ data class JfUserData(
 )
 
 @Serializable
+data class JfArtistRef(
+    val Id: String = "",
+    val Name: String? = null,
+)
+
+@Serializable
 data class JfItem(
     val Id: String = "",
     val Name: String? = null,
@@ -43,6 +49,8 @@ data class JfItem(
     val Album: String? = null,
     val AlbumId: String? = null,
     val Artists: List<String> = emptyList(),
+    /** Artistes avec leur identifiant : sert aux rangées de recommandation. */
+    val ArtistItems: List<JfArtistRef> = emptyList(),
     val AlbumArtist: String? = null,
     val ProductionYear: Int? = null,
     val RunTimeTicks: Long? = null,
@@ -72,6 +80,10 @@ data class JfItem(
 
     val isFavorite: Boolean
         get() = UserData?.IsFavorite == true
+
+    /** Identifiants des artistes du morceau (vide si l'API ne les a pas renvoyés). */
+    val artistIds: List<String>
+        get() = ArtistItems.map { it.Id }.filter { it.isNotBlank() }
 }
 
 @Serializable

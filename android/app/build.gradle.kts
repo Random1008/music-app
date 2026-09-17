@@ -26,8 +26,8 @@ android {
         applicationId = "fr.hermesmusic"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.7.0"
+        versionCode = 7
+        versionName = "0.8.0"
     }
 
     // Remplace l'ancien `resourceConfigurations`, déprécié dans AGP 9.

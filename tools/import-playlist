@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""Importe une playlist (ou un album) d'un service de streaming dans Hermes Music.
+
+    import-playlist <lien> [--name NOM] [--limit N] [--dry-run]
+
+Spotify, Apple Music et YouTube Music ne servent ici qu'à une chose : DONNER LA
+LISTE DES TITRES. Aucun audio n'est pris chez eux (impossible : le flux Spotify
+et Apple Music est chiffré, et on ne contourne pas ça). L'audio vient de YouTube
+via yt-dlp, exactement comme pour le reste de la bibliothèque.
+
+Ce que fait la commande :
+  1. lit la liste des titres chez le service (playlist ou album PUBLIC) ;
+  2. compare avec la bibliothèque Jellyfin et ne retélécharge que ce qui manque ;
+  3. télécharge sur YouTube, tague (titre/artiste/album/pochette) et range
+     dans Artists/<artiste>/<album>/NN - <titre>.mp3 ;
+  4. crée la playlist dans Jellyfin, dans l'ordre d'origine, et l'ouvre aux
+     autres comptes pour qu'elle apparaisse dans l'application.
+
+Exemples :
+    import-playlist "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+    import-playlist "https://music.apple.com/fr/album/..." --dry-run
+    import-playlist "https://music.youtube.com/playlist?list=..." --limit 5
+"""
+from __future__ import annotations
+
+import argparse
+import getpass
+import json
+import os
+import re
+import shutil
+import sys
+import tempfile
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+IMPORTER = os.path.join(os.path.dirname(HERE), "importer")
+sys.path.insert(0, IMPORTER)
+
+# L'importateur lit YTDLP au moment de l'import : on lui pointe le venv d'abord.
+_VENV_YTDLP = os.path.join(IMPORTER, ".venv", "bin", "yt-dlp")
+if os.path.exists(_VENV_YTDLP):
+    os.environ.setdefault("YTDLP", _VENV_YTDLP)
+
+import jellyfin as jf  # noqa: E402  (charge .env en s'important)
+from connect import SERVICE_LABELS, fetch, fmt_duration, norm_key  # noqa: E402
+
+import importer as imp  # noqa: E402
+
+SLEEP = float(os.environ.get("IMPORTER_SLEEP", "2"))
+LISTS_DIR = os.path.join(IMPORTER, "library", "playlists")
+
+
+def die(message: str, code: int = 1):
+    sys.stdout.flush()
+    print("\nERREUR : " + message, file=sys.stderr, flush=True)
+    sys.exit(code)
+
+
+def slug(text: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9]+", "-", text or "").strip("-").lower()
+    return s[:60] or "playlist"
+
+
+def authenticate(args):
+    """Jeton utilisateur Jellyfin (obligatoire : la clé d'API ne peut pas écrire)."""
+    user = args.user or os.environ.get("JELLYFIN_USER") or ""
+    password = os.environ.get("JELLYFIN_PASSWORD") or ""
+    if not user:
+        if not sys.stdin.isatty():
+            die("compte Jellyfin inconnu — utilise --user NOM, ou renseigne "
+                "JELLYFIN_USER / JELLYFIN_PASSWORD dans .env")
+        user = input("Compte Jellyfin utilisé pour créer la playlist : ").strip()
+    if not password:
+        if not sys.stdin.isatty():
+            die("mot de passe absent — renseigne JELLYFIN_PASSWORD dans .env")
+        password = getpass.getpass("Mot de passe de %s (gardé une seule fois) : " % user)
+    return jf.authenticate(user, password)
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True, description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("url", help="lien de playlist ou d'album (Spotify, Apple Music, YouTube Music)")
+    ap.add_argument("--name", help="nom de la playlist dans Hermes Music (défaut : nom d'origine)")
+    ap.add_argument("--limit", type=int, default=0, help="ne traiter que les N premiers titres")
+    ap.add_argument("--dry-run", action="store_true", help="montrer sans rien télécharger")
+    ap.add_argument("--no-playlist", action="store_true",
+                    help="importer les morceaux sans créer de playlist Jellyfin")
+    ap.add_argument("--user", help="compte Jellyfin (défaut : JELLYFIN_USER de .env)")
+    ap.add_argument("--yes", action="store_true", help="ne pas demander de confirmation")
+    args = ap.parse_args()
+
+    print("=== 1. Lecture de la liste chez le service ===")
+    try:
+        data = fetch(args.url)
+    except Exception as exc:  # noqa: BLE001
+        die(str(exc))
+    label = SERVICE_LABELS.get(data["service"], data["service"])
+    tracks = data["tracks"]
+    if args.limit:
+        tracks = tracks[:args.limit]
+    print("  service  : %s (%s)" % (label, data["kind"]))
+    print("  liste    : %s" % data["name"])
+    print("  titres   : %d%s" % (len(tracks), " (tronqué)" if args.limit else ""))
+    print("  rappel   : seuls les TITRES viennent de %s — l'audio vient de YouTube" % label)
+    for t in tracks[:5]:
+        print("     %2d. %s — %s (%s)" % (t["position"], t["artist"], t["title"],
+                                          fmt_duration(t["duration_s"])))
+    if len(tracks) > 5:
+        print("     … et %d autre(s)" % (len(tracks) - 5))
+
+    print("\n=== 2. Comparaison avec la bibliothèque ===")
+    token, user_id = authenticate(args)
+    index = jf.library_index(user_id)
+    print("  bibliothèque : %d morceaux indexés" % len(index))
+
+    todo, already = [], []
+    for t in tracks:
+        key = norm_key(t["artists"] or t["artist"], t["title"])
+        if key in index:
+            already.append((t, index[key]))
+        else:
+            todo.append((t, key))
+    print("  déjà présents : %d" % len(already))
+    print("  à importer    : %d" % len(todo))
+    for t, _ in todo[:5]:
+        print("     + %s — %s" % (t["artist"], t["title"]))
+    if len(todo) > 5:
+        print("     … et %d autre(s)" % (len(todo) - 5))
+
+    os.makedirs(LISTS_DIR, exist_ok=True)
+    with open(os.path.join(LISTS_DIR, slug(args.name or data["name"]) + ".json"), "w",
+              encoding="utf-8") as fh:
+        json.dump({"service": data["service"], "kind": data["kind"], "name": data["name"],
+                   "url": args.url, "fetched": time.strftime("%Y-%m-%d %H:%M:%S"),
+                   "tracks": tracks}, fh, ensure_ascii=False, indent=1)
+
+    if args.dry_run:
+        print("\n--dry-run : rien n'a été téléchargé ni créé.")
+        return
+
+    if todo and not args.yes and sys.stdin.isatty():
+        answer = input("\nTélécharger %d morceau(x) depuis YouTube ? [o/N] " % len(todo)).strip()
+        if answer.lower() not in ("o", "oui", "y", "yes"):
+            die("annulé", 0)
+
+    fallback_album = args.name or data["name"]
+    cover_fallback = data.get("artwork_url") or ""
+    results = []
+    if todo:
+        print("\n=== 3. Téléchargement (YouTube -> MP3 taggé) ===")
+        for i, (t, key) in enumerate(todo, 1):
+            entry = {
+                "title": t["title"],
+                "artists": t["artists"] or t["artist"],
+                "album_artist": t["artist"],
+                "album": t.get("album") or fallback_album,
+                "track_num": str(t["position"]),
+                "image_url": t.get("artwork_url") or cover_fallback,
+            }
+            out = imp.target_path(entry)
+            if os.path.exists(out):
+                print("[%d/%d] déjà sur le disque  %s — %s" % (i, len(todo), t["artist"], t["title"]))
+                results.append((t, key, True))
+                continue
+            tmp = tempfile.mkdtemp(prefix="plimp_")
+            try:
+                direct = t["source_url"] if data["service"] == "youtube" else None
+                audio, yt_title, _ = imp.download_audio(t["artist"], t["title"], tmp, url=direct)
+                cover = imp.download_cover(entry["image_url"], tmp)
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                imp.convert_and_tag(audio, cover, entry, out)
+                results.append((t, key, True))
+                print("[%d/%d] OK   %s — %s" % (i, len(todo), t["artist"], t["title"]))
+            except Exception as exc:  # noqa: BLE001
+                results.append((t, key, False))
+                print("[%d/%d] ÉCHEC %s — %s -> %s" % (i, len(todo), t["artist"], t["title"],
+                                                       str(exc)[:110]))
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+            time.sleep(SLEEP)
+
+        ok = sum(1 for _, _, good in results if good)
+        print("  %d morceau(x) prêt(s)" % ok)
+
+    failed_keys = {key for _, key, good in results if not good}
+    if failed_keys:
+        print("\n=== 4. Indexation Jellyfin ===")
+        print("  %d titre(s) en échec, ils seront retentés au prochain lancement" % len(failed_keys))
+    else:
+        print("\n=== 4. Indexation Jellyfin ===")
+    if todo:
+        jf.scan()
+        wanted = [key for _, key, good in results if good]
+        index, missing = jf.wait_for_keys(wanted, user_id, timeout=420)
+        if missing:
+            print("  ATTENTION : %d morceau(x) pas encore indexés (ils manqueront "
+                  "à la playlist) : %s" % (len(missing), ", ".join(missing[:3])))
+    else:
+        index = jf.library_index(user_id)
+
+    if args.no_playlist:
+        print("\n--no-playlist : playlist non créée.")
+        return
+
+    print("\n=== 5. Playlist dans Jellyfin ===")
+    name = args.name or data["name"]
+    ordered_ids, missing_titles = [], []
+    for t in tracks:
+        key = norm_key(t["artists"] or t["artist"], t["title"])
+        if key in failed_keys:
+            continue
+        item = index.get(key)
+        if item:
+            ordered_ids.append(item["Id"])
+        else:
+            missing_titles.append("%s — %s" % (t["artist"], t["title"]))
+
+    if not ordered_ids:
+        die("aucun morceau à mettre dans la playlist")
+    if missing_titles:
+        print("  %d titre(s) absent(s) de la playlist : %s"
+              % (len(missing_titles), ", ".join(missing_titles[:3])))
+
+    playlist_id = jf.find_playlist(name, user_id)
+    if playlist_id:
+        present = {e.get("Id") for e in jf.playlist_entries(playlist_id, user_id, token)}
+        fresh = [i for i in ordered_ids if i not in present]
+        added = jf.add_items(playlist_id, fresh, user_id, token)
+        print("  playlist « %s » déjà présente : %d morceau(x) ajouté(s)" % (name, added))
+    else:
+        playlist_id = jf.create_playlist(name, ordered_ids, user_id, token)
+        print("  playlist « %s » créée avec %d morceau(x)" % (name, len(ordered_ids)))
+
+    # Partage avec les autres comptes. On renvoie la liste RÉELLE des morceaux :
+    # POST /Playlists/{id} remplace le contenu par le champ Ids, donc un appel de
+    # partage avec Ids vide viderait la playlist (piège vérifié, cf. jellyfin.py).
+    current = [e.get("Id") for e in jf.playlist_entries(playlist_id, user_id, token)]
+    other_users = [u for u in jf.users() if u.get("Id") != user_id]
+    jf.update_playlist(playlist_id, name, current, user_id, token,
+                       others=[u["Id"] for u in other_users])
+
+    print("\n=== 6. Contrôle final côté serveur ===")
+    entries = jf.playlist_entries(playlist_id, user_id, token)
+    expected = list(dict.fromkeys(ordered_ids))
+    present = {e.get("Id") for e in entries}
+    print("  entrées réellement présentes : %d (attendu %d)" % (len(entries), len(expected)))
+    for e in entries[:5]:
+        print("     · %s" % (e.get("Name") or "?"))
+    for u in other_users:
+        visible = playlist_id in {p.get("Id") for p in jf.playlists_for_user(u["Id"])}
+        print("  visible pour « %s » : %s" % (u.get("Name"), "oui" if visible else "NON"))
+
+    manquants = [i for i in expected if i not in present]
+    if manquants:
+        die("la playlist ne contient pas tous les morceaux : %d manquant(s) "
+            "sur %d" % (len(manquants), len(expected)))
+
+    print("\nTerminé : « %s » — %d morceau(x) vérifié(s) côté serveur." % (name, len(entries)))
+    print("Elle apparaît dans l'application, onglet Bibliothèque, filtre Playlists.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        die("interrompu", 130)

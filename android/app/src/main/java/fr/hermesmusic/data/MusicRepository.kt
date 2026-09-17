@@ -17,7 +17,7 @@ class MusicRepository(
 ) {
     companion object {
         const val FIELDS =
-            "ImageTags,AlbumPrimaryImageTag,AlbumArtist,Artists,Album,AlbumId," +
+            "ImageTags,AlbumPrimaryImageTag,AlbumArtist,Artists,ArtistItems,Album,AlbumId," +
                 "ProductionYear,ChildCount,RunTimeTicks,IndexNumber,UserData,PlaylistItemId"
     }
 

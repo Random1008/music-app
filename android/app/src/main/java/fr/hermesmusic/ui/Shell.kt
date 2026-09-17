@@ -2,6 +2,7 @@ package fr.hermesmusic.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -133,7 +135,14 @@ fun Shell(graph: AppGraph) {
     }
 }
 
-/** Mini-lecteur persistant : jaquette, titre, artiste, lecture/pause, suivant. */
+/**
+ * Mini-lecteur persistant : jaquette, titre, artiste, lecture/pause, suivant.
+ *
+ * Un glissement vers le haut ouvre le lecteur plein écran — le geste attendu
+ * dans une application de streaming — sans retirer le simple appui, qui marche
+ * aussi. Le geste est reconnu après un déplacement franc (40 px), donc un appui
+ * sur les boutons lecture/suivant n'ouvre jamais le lecteur par accident.
+ */
 @Composable
 private fun MiniPlayer(graph: AppGraph, onOpen: () -> Unit) {
     val s by graph.player.state.collectAsStateWithLifecycle()
@@ -147,6 +156,16 @@ private fun MiniPlayer(graph: AppGraph, onOpen: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Nocturne.Surface2)
+            .pointerInput(Unit) {
+                var cumul = 0f
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (cumul <= -40f) onOpen()
+                        cumul = 0f
+                    },
+                    onDragCancel = { cumul = 0f },
+                ) { _, amount -> cumul += amount }
+            }
             .clickable { onOpen() },
     ) {
         Row(
