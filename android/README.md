@@ -19,10 +19,13 @@ applications de streaming modernes, sans copier leur identité :
 | Trois onglets | Accueil, Recherche, Bibliothèque |
 | Fond coloré par contenu | dégradé tiré de la pochette (pages album/artiste/playlist, lecteur) |
 | Grille compacte « récemment écouté » | six vignettes sur deux colonnes, en haut de l'accueil |
+| Titres likés épinglé | carte à dégradé en tête de bibliothèque, avec le nombre de morceaux |
+| Rangées de recommandation | « Mix du jour » et « Plus de <artiste> », construits à partir de l'historique |
 | Filtres de bibliothèque | Albums · Artistes · Morceaux · Playlists · Favoris · Téléchargés |
 | Bouton lecture principal | rond, à droite de la pochette, impossible à rater |
 | Salutation | Bonjour / Bon après-midi / Bonsoir selon l'heure |
 | Page « parcourir » | vignettes d'artistes quand le champ de recherche est vide |
+| Mini-lecteur | un glissement vers le haut ouvre le lecteur plein écran |
 
 ## Ce que fait l'application
 
@@ -30,9 +33,9 @@ applications de streaming modernes, sans copier leur identité :
 |---|---|
 | Connexion | adresse du serveur, utilisateur, mot de passe (jamais conservé) |
 | Serveur injoignable | explication, **Réessayer**, déconnexion, et ce qui reste écoutable hors-ligne |
-| Accueil | salutation, reprendre la lecture, récemment écouté, albums récents, playlists, favoris, derniers ajouts |
+| Accueil | salutation, reprendre la lecture, récemment écouté, **mix du jour**, **plus de <artiste>**, albums récents, playlists, favoris, derniers ajouts |
 | Recherche | morceaux, albums, artistes — instantanée, filtres par catégorie, « parcourir » quand c'est vide |
-| Bibliothèque | six filtres, bouton « Playlist » pour créer, téléchargements locaux |
+| Bibliothèque | **titres likés épinglés en tête**, six filtres, bouton « Playlist » pour créer, téléchargements locaux |
 | Page album | fond dérivé de la pochette, Lecture / Aléatoire, favori, ajout à une playlist, téléchargement |
 | Page artiste | photo (ou pochette du premier album), ses albums, ses titres les plus écoutés |
 | Page playlist | pochette du premier morceau, renommer, supprimer, retirer et réordonner |
@@ -60,6 +63,29 @@ d'écran : le lecteur vit dans un service, pas dans l'interface.
   pas sa palette à chaque recomposition.
 * Si l'extraction échoue, un dégradé neutre prend le relais — jamais de fond vide
   ni d'erreur visible.
+
+## Les rangées de recommandation
+
+Aucun service externe, aucun modèle, aucun classement opaque : les rangées de
+l'accueil sont construites **uniquement** à partir de ta propre bibliothèque.
+
+* Les artistes qui reviennent le plus souvent dans les morceaux récemment
+  écoutés, les favoris et la reprise de lecture servent de point de départ (trois
+  au maximum). Leurs identifiants viennent du champ `ArtistItems`, ajouté aux
+  champs demandés à Jellyfin.
+* « **Mix du jour** » entrelace ces artistes, un titre de chacun à tour de rôle
+  (quinze titres). Sans cet entrelacement, la file d'attente sonnerait comme des
+  albums enchaînés plutôt que comme une sélection — c'est tout l'intérêt.
+* « **Plus de \<artiste\>** » reprend leurs morceaux les plus écoutés.
+
+Un appui sur une pochette lance la rangée entière comme file d'attente ; le
+bouton « Tout lire » fait la même chose depuis le premier titre.
+
+À savoir : **Jellyfin compte une écoute dès le premier rapport
+`/Sessions/Playing`**, mesuré appel par appel sur un morceau remis à zéro au
+préalable. Un morceau survolé apparaît donc quand même dans « Récemment écouté »
+et compte pour l'historique. C'est le serveur qui décide, pas l'application, et
+un client Jellyfin classique se comporte pareil.
 
 ## Hors-ligne : ce qui est réellement stocké
 

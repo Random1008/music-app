@@ -7,6 +7,7 @@ Plateforme personnelle de streaming musical auto-hébergée.
 - **Application Android** (Kotlin + Jetpack Compose) — client de lecture
 - **Client web** (`web/`) — même bibliothèque depuis un navigateur
 - **`music`** — administration du serveur depuis le terminal
+- **`import-playlist`** — import d'une playlist Spotify / Apple Music / YouTube Music
 
 ## État
 
@@ -19,6 +20,7 @@ Plateforme personnelle de streaming musical auto-hébergée.
 - [x] V0.6 — Interface avancée (accueil, albums, artistes, historique)
 - [x] V0.7 — Accès distant (Tailscale Funnel, HTTPS Let's Encrypt)
 - [x] V0.8 — Mode hors-ligne (téléchargement, écoute sans réseau)
+- [x] Connecteurs — import de playlists Spotify / Apple Music / YouTube Music
 - [~] V1.0 — Production : tests unitaires faits ; **sauvegardes et monitoring à faire**
 
 ## Architecture
@@ -108,10 +110,39 @@ récupérés par **URL directe** (pas de recherche approximative) et télécharg
 connue : certains titres sont protégés par un *PO token* et restent hors de
 portée de yt-dlp, même avec des cookies.
 
+## Connecteurs de playlists
+
+Importer une playlist ou un album Spotify / Apple Music / YouTube Music dans la
+bibliothèque, depuis le terminal :
+
+```bash
+tools/import-playlist "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+tools/import-playlist "https://music.apple.com/fr/album/..." --dry-run
+tools/import-playlist "https://music.youtube.com/playlist?list=..." --limit 5
+```
+
+Les trois services ne fournissent que **la liste des titres** : l'audio vient
+toujours de YouTube, par yt-dlp. Aucun audio n'est pris chez Spotify ou Apple
+Music, dont le flux est chiffré.
+
+La commande ne retélécharge que ce qui manque, range les morceaux comme le reste
+de la bibliothèque, crée la playlist dans l'ordre d'origine, la partage avec les
+autres comptes, puis **recontrôle le résultat côté serveur** avant de dire
+« terminé ». La relancer est sans danger.
+
+Les playlists et albums **publics** des trois services se lisent sans aucun
+compte. Les listes privées demandent un compte — c'est possible pour YouTube Music
+(cookies), impossible pour Apple Music (jeton développeur payant) et pour Spotify
+(jeton OAuth ; l'export CSV d'Exportify reste la solution de repli).
+
+Détail de ce qui marche, de ce qui est impossible et des pièges vérifiés :
+`docs/connecteurs.md`.
+
 ## Documentation
 
 - `docs/architecture.md` — choix techniques
 - `docs/app-ui-spec.md` — spécification UI/UX de l'application Android
 - `docs/access.md` — adresses d'accès et exposition publique
+- `docs/connecteurs.md` — import de playlists Spotify / Apple Music / YouTube Music
 - `android/README.md` — application Android : fonctionnalités, structure, tests
 - `web/README.md` — client web
