@@ -39,33 +39,34 @@
 <main>
   <div class="kicker">HERMES MUSIC</div>
   <h1>Installer l'application</h1>
-  <div class="sub">Application Android · version 0.7.0</div>
+  <div class="sub">Application Android · version 0.8.0</div>
 
   <div class="card">
     <div class="name">Hermes Music</div>
-    <div class="meta">fr.hermesmusic · 24,1 Mo · Android 8+ (minSdk 26)</div>
+    <div class="meta">fr.hermesmusic · 24,2 Mo · Android 8+ (minSdk 26)</div>
     <div class="meta">Signée avec la clé de développement stable<br>(71:F3:BF:DA:CA:B1:3F:5B:0E:D5:C3:65:4A:4C:65:64:…)</div>
-    <div class="hash">SHA-256 : 492172954d65ff77aaa6a266cf921393dc952ee94aba876534e726c8296ea2fc</div>
-    <a class="btn" href="hermes-music-0.7.0-debug.apk" download>Télécharger l'APK</a>
+    <div class="hash">SHA-256 : 5cc49ca37444b1be9119b9e61bcb8838832c7ec55295c479c280aa6810377321</div>
+    <a class="btn" href="hermes-music-0.8.0-debug.apk" download>Télécharger l'APK</a>
   </div>
 
   <h2>NOUVEAU DANS CETTE VERSION</h2>
   <ul>
-    <li><b>Le fond prend la couleur de la pochette.</b> Pages album, artiste,
-        playlist et lecteur : chaque morceau a sa propre ambiance, en restant
-        dans le ton sombre de l'application.</li>
-    <li><b>Trois onglets</b> au lieu de quatre : Accueil, Recherche,
-        Bibliothèque. Les playlists et les favoris sont maintenant dans la
-        Bibliothèque, à côté des albums.</li>
-    <li><b>Récemment écouté en grille compacte</b> : six vignettes sur deux
-        colonnes, en haut de l'accueil.</li>
-    <li><b>Filtres dans la Bibliothèque</b> : Albums, Artistes, Morceaux,
-        Playlists, Favoris, Téléchargés — avec un bouton <b>Playlist</b> pour
-        en créer une sur place.</li>
-    <li><b>Grand bouton lecture rond</b>, placé à droite de la pochette.</li>
-    <li><b>Bonjour / Bon après-midi / Bonsoir</b> selon l'heure, et une page
-        <b>Parcourir</b> avec des vignettes d'artistes quand la recherche est vide.</li>
+    <li><b>« Titres likés », épinglé en tête de la Bibliothèque.</b> Une carte à
+        dégradé avec le nombre de morceaux, avant tous les filtres : un appui
+        ouvre tes favoris.</li>
+    <li><b>Glisse le mini-lecteur vers le haut</b> pour ouvrir le lecteur plein
+        écran. Un simple appui fonctionne toujours — le geste demande un
+        déplacement franc, donc les boutons lecture/suivant ne le déclenchent
+        jamais par accident.</li>
+    <li><b>Mix du jour</b> : tes artistes les plus écoutés, un titre de chacun à
+        tour de rôle, dans une seule file d'attente.</li>
+    <li><b>« Plus de &lt;artiste&gt; »</b> juste en dessous, pour rester dans le
+        même univers.</li>
   </ul>
+  <p style="color:var(--dim);font-size:13px;line-height:1.7">
+    Ces deux rangées sont construites uniquement à partir de ce que tu écoutes et
+    de tes favoris. Aucun service externe, aucun classement opaque.
+  </p>
 
   <h2>INSTALLATION SUR LE TÉLÉPHONE</h2>
   <ol>
@@ -89,6 +90,12 @@
     <br><br>
     Le mot de passe n'est pas conservé : seul un jeton d'accès est enregistré
     sur l'appareil.
+    <br><br>
+    <b>Nouveau côté serveur</b> : les playlists de Spotify, Apple Music et
+    YouTube Music peuvent maintenant être importées dans la bibliothèque
+    (l'audio vient toujours de YouTube). Depuis un terminal sur le NAS :
+    <br><code>tools/import-playlist "&lt;lien de playlist&gt;"</code><br>
+    La playlist apparaît ensuite ici, onglet Bibliothèque, filtre Playlists.
     <br><br>
     Pour mettre à jour plus tard : retélécharge l'APK et installe par-dessus —
     la clé de signature étant constante, aucune désinstallation n'est nécessaire
