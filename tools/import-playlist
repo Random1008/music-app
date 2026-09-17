@@ -113,7 +113,7 @@ def main():
     print("\n=== 2. Comparaison avec la bibliothèque ===")
     token, user_id = authenticate(args)
     index = jf.library_index(user_id)
-    print("  bibliothèque : %d morceaux indexés" % len(index))
+    print("  bibliothèque : %d morceaux distincts (clé artiste + titre)" % len(index))
 
     todo, already = [], []
     for t in tracks:
