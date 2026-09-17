@@ -29,6 +29,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -49,6 +50,83 @@ import importer as imp  # noqa: E402
 
 SLEEP = float(os.environ.get("IMPORTER_SLEEP", "2"))
 LISTS_DIR = os.path.join(IMPORTER, "library", "playlists")
+
+# Une relecture complète de la bibliothèque prend 10 à 20 minutes sur ce NAS :
+# Jellyfin interroge MusicBrainz (service externe limité en débit) pour chaque
+# nouvel album, et un balayage déjà en cours ignore toute nouvelle demande. La
+# marge doit couvrir ce pire cas, sinon la playlist se crée sans ses morceaux.
+INDEX_TIMEOUT = int(os.environ.get("IMPORTER_INDEX_TIMEOUT", "1500"))
+
+
+# --------------------------------------------------------------------------
+# Filtre d'entrée : ce qui n'entre jamais dans la bibliothèque.
+# --------------------------------------------------------------------------
+
+# Durée plancher. En dessous, ce n'est pas une chanson : un extrait, une intro,
+# un bout de vidéo. Réglable par IMPORT_MIN_SECONDS (0 = pas de limite).
+MIN_SECONDS = int(os.environ.get("IMPORT_MIN_SECONDS", "60"))
+
+# Un AMV est un montage de fan (images d'animation posées sur une musique), pas
+# une chanson : sa place n'est pas dans une discothèque.
+_AMV = re.compile(r"\bamv\b|a\.?\s?m\.?\s?v\.?", re.IGNORECASE)
+
+
+def reject_reason(track: dict) -> str:
+    """Pourquoi ce titre est écarté ('' = il passe)."""
+    duree = track.get("duration_s") or 0
+    if MIN_SECONDS and 0 < duree < MIN_SECONDS:
+        return "moins d'une minute (%d s)" % duree
+    texte = " ".join([track.get("title") or "", track.get("artist") or "",
+                      track.get("artists") or "", track.get("album") or ""])
+    if _AMV.search(texte):
+        return "AMV (montage de fan)"
+    return ""
+
+
+def duree_fichier(chemin: str) -> int:
+    """Durée réelle du fichier obtenu, mesurée par ffprobe (0 si illisible)."""
+    try:
+        sonde = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", chemin],
+            capture_output=True, text=True, timeout=60)
+        return int(round(float(sonde.stdout.strip())))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _video_id(url: str) -> str:
+    """L'identifiant YouTube d'un lien ('' si ce n'en est pas un)."""
+    m = re.search(r"[?&]v=([A-Za-z0-9_-]{6,})", url or "")
+    if m:
+        return m.group(1)
+    m = re.search(r"youtu\.be/([A-Za-z0-9_-]{6,})", url or "")
+    return m.group(1) if m else ""
+
+
+def videos_deja_importees() -> set[str]:
+    """Les vidéos YouTube déjà importées, d'après le registre d'import.
+
+    Comparer artiste + titre ne suffit pas : un titre corrigé depuis (nettoyage
+    des tags) ne correspond plus à celui de la vidéo, et le morceau se
+    retéléchargerait. L'identifiant de la vidéo, lui, ne change jamais.
+    """
+    registre = os.path.join(IMPORTER, "library", "youtube_status.json")
+    try:
+        with open(registre, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return set()
+
+    entrees = data.values() if isinstance(data, dict) else data
+    vus = set()
+    for entree in entrees:
+        if not isinstance(entree, dict):
+            continue
+        vid = _video_id(entree.get("yt_url") or "")
+        if vid and (entree.get("state") or "") == "done":
+            vus.add(vid)
+    return vus
 
 
 def die(message: str, code: int = 1):
@@ -115,15 +193,37 @@ def main():
     index = jf.library_index(user_id)
     print("  bibliothèque : %d morceaux distincts (clé artiste + titre)" % len(index))
 
-    todo, already = [], []
+    todo, already, doublons, refuses, deja_videos = [], [], [], [], []
+    deja_vus = set()
+    videos_connues = videos_deja_importees()
     for t in tracks:
         key = norm_key(t["artists"] or t["artist"], t["title"])
-        if key in index:
+        if key in index:                      # déjà là : on ne retélécharge jamais
             already.append((t, index[key]))
-        else:
-            todo.append((t, key))
-    print("  déjà présents : %d" % len(already))
-    print("  à importer    : %d" % len(todo))
+            continue
+        if t.get("external_id") and t["external_id"] in videos_connues:
+            deja_videos.append(t)             # même vidéo, titre corrigé depuis
+            continue
+        if key in deja_vus:                   # le même titre deux fois dans la liste
+            doublons.append(t)
+            continue
+        deja_vus.add(key)
+        raison = reject_reason(t)
+        if raison:                            # < 1 minute ou AMV
+            refuses.append((t, raison))
+            continue
+        todo.append((t, key))
+    print("  déjà dans la bibliothèque : %d" % len(already))
+    print("  déjà importés (même vidéo) : %d" % len(deja_videos))
+    for t in deja_videos[:3]:
+        print("     = %s — %s" % (t["artist"], t["title"]))
+    print("  doublons dans la liste    : %d" % len(doublons))
+    print("  écartés par le filtre     : %d" % len(refuses))
+    for t, raison in refuses[:5]:
+        print("     × %s — %s  (%s)" % (t["artist"], t["title"], raison))
+    if len(refuses) > 5:
+        print("     … et %d autre(s) écarté(s)" % (len(refuses) - 5))
+    print("  à importer                : %d" % len(todo))
     for t, _ in todo[:5]:
         print("     + %s — %s" % (t["artist"], t["title"]))
     if len(todo) > 5:
@@ -145,9 +245,16 @@ def main():
         if answer.lower() not in ("o", "oui", "y", "yes"):
             die("annulé", 0)
 
-    fallback_album = args.name or data["name"]
+    # Pour une playlist, les morceaux sans album vont dans un dossier au nom de
+    # la liste — ça a du sens. Pour un MORCEAU SEUL, ce nom serait son propre
+    # titre : on suit la convention de la bibliothèque (« Singles »).
+    if data["kind"] == "music":
+        fallback_album = args.name or "Singles"
+    else:
+        fallback_album = args.name or data["name"]
     cover_fallback = data.get("artwork_url") or ""
     results = []
+    retires = []
     if todo:
         print("\n=== 3. Téléchargement (YouTube -> MP3 taggé) ===")
         for i, (t, key) in enumerate(todo, 1):
@@ -171,8 +278,17 @@ def main():
                 cover = imp.download_cover(entry["image_url"], tmp)
                 os.makedirs(os.path.dirname(out), exist_ok=True)
                 imp.convert_and_tag(audio, cover, entry, out)
-                results.append((t, key, True))
-                print("[%d/%d] OK   %s — %s" % (i, len(todo), t["artist"], t["title"]))
+                # Filet de sécurité : la durée annoncée par le service peut être
+                # fausse ou absente. On mesure le fichier réellement obtenu.
+                reel = duree_fichier(out)
+                if MIN_SECONDS and 0 < reel < MIN_SECONDS:
+                    os.remove(out)
+                    retires.append((t, reel))
+                    print("[%d/%d] ÉCARTÉ %s — %s : %d s seulement, fichier retiré"
+                          % (i, len(todo), t["artist"], t["title"], reel))
+                else:
+                    results.append((t, key, True))
+                    print("[%d/%d] OK   %s — %s" % (i, len(todo), t["artist"], t["title"]))
             except Exception as exc:  # noqa: BLE001
                 results.append((t, key, False))
                 print("[%d/%d] ÉCHEC %s — %s -> %s" % (i, len(todo), t["artist"], t["title"],
@@ -183,6 +299,8 @@ def main():
 
         ok = sum(1 for _, _, good in results if good)
         print("  %d morceau(x) prêt(s)" % ok)
+        if retires:
+            print("  %d morceau(x) écarté(s) après mesure de la durée" % len(retires))
 
     failed_keys = {key for _, key, good in results if not good}
     if failed_keys:
@@ -193,10 +311,14 @@ def main():
     if todo:
         jf.scan()
         wanted = [key for _, key, good in results if good]
-        index, missing = jf.wait_for_keys(wanted, user_id, timeout=420)
+        index, missing = jf.wait_for_keys(wanted, user_id, timeout=INDEX_TIMEOUT)
         if missing:
-            print("  ATTENTION : %d morceau(x) pas encore indexés (ils manqueront "
-                  "à la playlist) : %s" % (len(missing), ", ".join(missing[:3])))
+            print("  ATTENTION : %d morceau(x) pas encore indexés après %d s : %s"
+                  % (len(missing), INDEX_TIMEOUT, ", ".join(missing[:3])))
+            print("  La musique EST sur le disque. Jellyfin la publiera quand sa relecture")
+            print("  sera terminée (10 à 20 min sur ce NAS). Relance simplement la même")
+            print("  commande : rien ne sera retéléchargé, les morceaux manquants seront")
+            print("  ajoutés à la playlist.")
     else:
         index = jf.library_index(user_id)
 

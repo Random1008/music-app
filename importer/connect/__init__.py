@@ -6,7 +6,7 @@ Chaque connecteur expose deux fonctions :
     matches(url) -> bool
     fetch(url)   -> {
         service   : 'spotify' | 'apple' | 'youtube'
-        kind      : 'playlist' | 'album'
+        kind      : 'playlist' | 'album' | 'music'
         name      : nom de la liste chez le service
         url       : URL d'origine
         artwork_url : pochette de la liste

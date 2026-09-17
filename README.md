@@ -46,16 +46,18 @@ docker compose up -d      # Jellyfin sur http://<hôte>:8096
 Premier lancement : créer le compte administrateur, puis ajouter une
 bibliothèque « Musique » pointant sur `/music/Artists`.
 
-## Administration depuis le terminal
+## Administration et téléchargement depuis le terminal
 
-La commande `music` gère les comptes Jellyfin sans passer par l'interface web.
-Elle est livrée dans `tools/music` :
+La commande `music` gère les comptes Jellyfin **et télécharge de la musique**,
+sans passer par l'interface web. Elle est livrée dans `tools/music` :
 
 ```bash
 ln -s "$PWD/tools/music" ~/.local/bin/music   # installation (une fois)
 ```
 
 ```text
+music -m <lien>                    télécharge UN morceau   (lien YouTube Music)
+music -p <lien>                    télécharge UNE playlist (lien YouTube Music)
 music adduser <nom> [motdepasse]   crée un compte Jellyfin et lui donne un mot de passe
 music users                        liste les comptes
 music passwd  <nom> [motdepasse]   change le mot de passe d'un compte
@@ -63,7 +65,23 @@ music deluser <nom> [-y]           supprime un compte
 music help                         aide
 ```
 
-Comportements à connaître :
+`music -m` et `music -p` délèguent à `tools/import-playlist` : une seule
+mécanique d'import, filtre compris. Les options de cet outil s'ajoutent en fin de
+ligne et sont transmises telles quelles (`--dry-run`, `--limit N`, `--name NOM`).
+
+Trois choses ne sont **jamais** importées :
+
+* un morceau **déjà présent** — comparaison sur artiste + titre, *et* sur
+  l'identifiant de la vidéo YouTube déjà importée (un titre corrigé depuis ne
+  correspond plus à celui de la vidéo ; l'identifiant, lui, ne change jamais) ;
+* un morceau de **moins d'une minute** — extrait, intro, bout de vidéo ;
+* un **AMV** — montage de fan posé sur une musique, pas une chanson.
+
+Les deux derniers sont écartés à la lecture de la liste, puis **revérifiés sur le
+fichier réellement obtenu** (durée mesurée par `ffprobe`), au cas où le service
+annoncerait une durée fausse ou absente.
+
+Comportements à connaître pour les comptes :
 
 * Sans mot de passe sur la ligne de commande, il est **demandé masqué** (donc
   absent de l'historique du shell et de `ps`).

@@ -167,29 +167,57 @@ def find_playlist(name: str, user_id: str | None = None) -> str:
 
 
 def scan() -> None:
-    if not KEY:
-        print("  [scan] pas de clé d'API : scan sauté", flush=True)
-        return
+    """Demande à Jellyfin de relire la bibliothèque.
+
+    POST /Library/Refresh répond 403 avec la clé d'API (vérifié) : l'appel
+    échouait en silence et l'indexation n'avait jamais lieu. La voie qui marche
+    est de lancer la tâche planifiée « Scan Media Library ».
+    """
+    status, taches = _req("GET", "/ScheduledTasks")
+    if status == 200 and isinstance(taches, list):
+        for t in taches:
+            if "scan media library" in (t.get("Name") or "").lower():
+                st, _ = _req("POST", "/ScheduledTasks/Running/%s" % t.get("Id"))
+                print("  [scan] relecture de la bibliothèque demandée (HTTP %s)" % st,
+                      flush=True)
+                return
+    # Repli : l'ancienne route, au cas où une future version l'autorise.
     status, _ = _req("POST", "/Library/Refresh")
-    print("  [scan] bibliothèque Jellyfin en cours de mise à jour (HTTP %s)" % status, flush=True)
+    print("  [scan] bibliothèque Jellyfin en cours de mise à jour (HTTP %s)" % status,
+          flush=True)
 
 
-def wait_for_keys(keys, user_id: str, timeout: int = 300, interval: int = 6) -> tuple[dict, list]:
+def wait_for_keys(keys, user_id: str, timeout: int = 900, interval: int = 6,
+                  relance: int = 180) -> tuple[dict, list]:
     """Attend que Jellyfin ait indexé les morceaux fraîchement importés.
 
     Jellyfin indexe en tâche de fond : juste après un scan, les fichiers sont sur
     le disque mais absents de l'API. On boucle jusqu'à ce que TOUTES les clés
     attendues soient visibles (ou expiration du délai).
+
+    On RELANCE le balayage en cours de route, et c'est nécessaire : une relecture
+    complète prend ~10 minutes sur ce NAS, et demander un balayage pendant qu'un
+    autre tourne est ignoré sans le moindre message. Sans relance, on attend la
+    fin d'un balayage qui a commencé avant l'écriture des fichiers, et les
+    morceaux manquent à l'appel indéfiniment.
     """
     wanted = set(keys)
-    deadline = time.time() + timeout
+    debut = time.time()
+    prochaine_relance = debut + relance
+    dernier_affichage = 0.0
     index = {}
     while True:
         index = library_index(user_id)
         missing = [k for k in wanted if k not in index]
-        if not missing or time.time() > deadline:
+        if not missing or time.time() > debut + timeout:
             return index, missing
-        print("  [index] %d morceau(x) encore en cours d'indexation…" % len(missing), flush=True)
+        if time.time() >= prochaine_relance:
+            scan()
+            prochaine_relance = time.time() + relance
+        if time.time() - dernier_affichage >= 60:
+            print("  [index] %d morceau(x) encore en cours d'indexation… (%.0f s)"
+                  % (len(missing), time.time() - debut), flush=True)
+            dernier_affichage = time.time()
         time.sleep(interval)
 
 

@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
 """music — administration de la plateforme Hermes Music depuis le terminal.
 
+    music -m <lien>                    télécharge UN morceau  (lien YouTube Music)
+    music -p <lien>                    télécharge UNE playlist (lien YouTube Music)
     music adduser <nom> [motdepasse]   crée un compte Jellyfin et lui donne un mot de passe
     music users                        liste les comptes
     music passwd  <nom> [motdepasse]   change le mot de passe d'un compte
     music deluser <nom> [-y]           supprime un compte
     music help                         cette aide
+
+Le téléchargement passe par tools/import-playlist : la liste des titres vient du
+service, l'audio vient de YouTube. Trois choses ne sont JAMAIS importées :
+
+    - un morceau déjà présent (comparaison artiste + titre) : rien n'est
+      téléchargé deux fois, ni dans la bibliothèque, ni au sein d'une même liste ;
+    - un morceau de moins d'une minute (extrait, intro, bout de vidéo) ;
+    - un AMV (montage de fan sur une musique, pas une chanson).
+
+Ces deux derniers sont écartés à la lecture de la liste, puis revérifiés après
+téléchargement sur le fichier réellement obtenu.
 
 Sans mot de passe sur la ligne de commande, il est demandé masqué (rien
 n'apparaît alors dans l'historique du shell ni dans `ps`).
@@ -20,6 +33,7 @@ from __future__ import annotations
 import getpass
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -295,6 +309,35 @@ def cmd_deluser(args: list[str]):
 
 
 # --------------------------------------------------------------------------
+# Téléchargement
+# --------------------------------------------------------------------------
+
+def cmd_import(argv: list[str], playlist: bool) -> int:
+    """« music -m <lien> » / « music -p <lien> » : télécharger depuis YouTube Music.
+
+    Tout le travail est fait par tools/import-playlist : c'est la même mécanique
+    que pour le reste de la bibliothèque, filtre compris. On ne la réécrit pas ici.
+    """
+    option = "-p" if playlist else "-m"
+    if not argv:
+        die(f"usage : music {option} <lien YouTube Music>")
+
+    outil = os.path.join(ROOT, "tools", "import-playlist")
+    if not os.path.exists(outil):
+        die(f"outil d'import introuvable : {outil}")
+
+    commande = [outil, argv[0]] + argv[1:]
+    if not playlist:
+        # Un morceau seul : rien à mettre dans une playlist, et rien à confirmer.
+        commande += ["--no-playlist", "--yes"]
+
+    try:
+        return subprocess.run(commande, check=False).returncode
+    except KeyboardInterrupt:
+        return 130
+
+
+# --------------------------------------------------------------------------
 
 COMMANDS = {
     "adduser": cmd_adduser,
@@ -310,6 +353,13 @@ def main():
 
     if not argv or argv[0] in ("help", "-h", "--help"):
         usage(0)
+
+    # Téléchargement : « music -m <lien> » / « music -p <lien> ». Ces deux-là ne
+    # passent pas par la clé d'API : l'outil d'import lit le .env lui-même.
+    if argv[0] in ("-m", "--music"):
+        sys.exit(cmd_import(argv[1:], playlist=False))
+    if argv[0] in ("-p", "--playlist"):
+        sys.exit(cmd_import(argv[1:], playlist=True))
 
     command = argv[0]
     if command not in COMMANDS:
